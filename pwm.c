@@ -49,21 +49,6 @@ void launchPwm (const uint16_t pwmFreq, const uint16_t tickPerPeriod)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static noreturn void pwmCommand(void *arg) 
 {
 
