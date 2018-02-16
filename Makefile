@@ -99,13 +99,13 @@ PROJECT = ch
 BOARD = DEVBOARDM4
 
 # Imported source files and paths
-MY_DIRNAME=../../../ChibiOS_17.6_stable
+MY_DIRNAME=../../../ChibiOS_stable
 ifneq "$(wildcard $(MY_DIRNAME) )" ""
    RELATIVE=../../..
 else
   RELATIVE=../..
 endif
-CHIBIOS = $(RELATIVE)/ChibiOS_17.6_stable
+CHIBIOS = $(RELATIVE)/ChibiOS_stable
 STMSRC = $(RELATIVE)/COMMON/stm
 VARIOUS = $(RELATIVE)/COMMON/various
 USBD_LIB = $(VARIOUS)/Chibios-USB-Devices
