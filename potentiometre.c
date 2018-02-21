@@ -5,8 +5,8 @@
 #include "stdutil.h"
 
 #define ADC_GRP1_NUM_CHANNELS   1
-#define ADC_GRP1_BUF_DEPTH      1
-static adcsample_t samples1[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
+#define ADC_GRP1_BUF_DEPTH      4
+static adcsample_t samples[ADC_GRP1_NUM_CHANNELS * ADC_GRP1_BUF_DEPTH];
 
 /*
  * ADC conversion group.
@@ -33,11 +33,16 @@ static const ADCConversionGroup adcgrpcfg1 = {
 void initPotentiometre(void)
 {
   adcStart(&ADCD1, NULL);
-  adcStartConversion (&ADCD1, &adcgrpcfg1, samples1, ADC_GRP1_BUF_DEPTH);
+  adcStartConversion (&ADCD1, &adcgrpcfg1, samples, ADC_GRP1_BUF_DEPTH);
 }
 
 
 float getPotValue (void)
 {
-  return (samples1[0] / 4095.0f);
+  uint32_t sampleSum=0;
+  for (size_t i=0; i< ADC_GRP1_BUF_DEPTH; i++) {
+    sampleSum += samples[i];
+  }
+  
+  return sampleSum / ADC_GRP1_BUF_DEPTH / 4095.0f;
 }

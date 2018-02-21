@@ -16,7 +16,7 @@
 
 /*
 
-  ° connecter A04 (ADC1_IN11) sur le potentiomètre à bouton
+  ° connecter A04 (ADC1_IN4) sur le potentiomètre à bouton
   ° laisser le jumper entre +3.3V et TOPs pour ce potentiomètre
   ° connecter A15 sur led8 
   ° connecter A15 sur A08 : rebouclage PWM vers ICU
@@ -25,15 +25,16 @@
   ° connecter C00 sur led1 
  */
 static void icuOverflowCb(ICUDriver *icup);
+static void icuWidthCb(ICUDriver *icup);
 static bool hasOverflood = false;
 
 
 static const ICUConfig icucfg = {
   .mode = ICU_INPUT_ACTIVE_HIGH,
   .frequency = 10000,                                    /* 10kHz ICU clock frequency.   */
-  .width_cb = NULL,
+  .width_cb = &icuWidthCb,
   .period_cb = NULL,
-  .overflow_cb = icuOverflowCb,
+  .overflow_cb = &icuOverflowCb,
   .channel = ICU_CHANNEL_1,
   .dier = 0
 };
@@ -82,7 +83,6 @@ static noreturn void blinker (void *arg)
   chRegSetThreadName("blinker");
   while (true) {
     if (hasOverflood) {
-      hasOverflood = false;
       DebugTrace ("** overflow **");
     } else {
       DebugTrace("period = %lu, width = %lu", icuGetPeriodX(&ICUD1), icuGetWidthX(&ICUD1));
@@ -96,4 +96,10 @@ static void icuOverflowCb(ICUDriver *icup)
 {
   (void) icup;
   hasOverflood = true;
+}
+
+static void icuWidthCb(ICUDriver *icup)
+{
+  (void) icup;
+  hasOverflood = false;
 }

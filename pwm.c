@@ -62,8 +62,13 @@ static noreturn void pwmCommand(void *arg)
 
     // pour la led, on veut balayer toute la plage de 0 à tickPerPeriod
     // attention, pour le servomoteur ce ne sera plus le cas !
-    const pwmcnt_t newPeriod = potentiometerVal * pwmcfg.period; 
+    pwmcnt_t newPeriod = potentiometerVal * pwmcfg.period;
+    if (newPeriod == 1)
+      newPeriod = 0;
+    else  if ((pwmcfg.period - newPeriod) == 1)
+      newPeriod = pwmcfg.period;
 
+    //DebugTrace ("newPeriod = %lu", newPeriod);
     pwmEnableChannel(&PWMD2, 0, newPeriod); // entre 0 et tickPerPeriod
     
     // la frequence  maximum pour changer la valeur du pwm est la valeur du pwm :
