@@ -61,7 +61,7 @@ static const ICUConfig icu1ch1_cfg = {
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 
-static uint16_t samples[128] = {0}; // took 0.0128 seconds to fill
+static uint16_t samples[128] __attribute__((aligned(4))) = {0}; // took 0.0128 seconds to fill
 
 int main(void) {
 
@@ -153,9 +153,17 @@ static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
     STM32_DMA_CR_MINC        | STM32_DMA_CR_TCIE        | // memory increment, transfert complete ISR enable
     STM32_DMA_CR_DMEIE       | STM32_DMA_CR_TEIE; // direct mode error and transfert error ISR enable
 
+#if STM32_DMA_ADVANCED
+  dmamode |= (STM32_DMA_CR_PBURST_INCR4 | STM32_DMA_CR_MBURST_INCR4);
+#endif
+
+  
   if (depth > 1) {
     dmamode |= (STM32_DMA_CR_CIRC | STM32_DMA_CR_HTIE);
   }
+
+  
+
   
   dmaStreamSetMemory0(dmastream, widthsAndPeriods);
   dmaStreamSetTransactionSize(dmastream, depth);
