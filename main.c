@@ -30,7 +30,8 @@
 #define ICU1_CH1_DMA_PRIORITY	6
 #define ICU1_CH1_DMA_CHANNEL	0
 #define ICU1_CHANNEL		ICU_CHANNEL_1
-
+#define DCR_DBL			(1 << 8) // 2 transfert
+#define DCR_DBA			(((uint32_t *) (&ICUD1.tim->CCR) - ((uint32_t *) ICUD1.tim))) // first register to get is CCR1
 
 
 
@@ -46,7 +47,7 @@ static void icu_lld_serve_rx_interrupt(ICUDriver *icup, uint32_t flags);
 
 static const ICUConfig icu1ch1_cfg = {
   .mode = ICU_INPUT_ACTIVE_HIGH,
-  .frequency = 1000000,                                    /* 10kHz ICU clock frequency.   */
+  .frequency = 1000000,                                    /* 1Mhz ICU clock frequency.   */
   .width_cb = NULL,
   .period_cb = NULL,
   .overflow_cb = NULL,
@@ -84,6 +85,7 @@ int main(void) {
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   dmaStart();
   icuStart(&ICUD1, &icu1ch1_cfg);
+  ICUD1.tim->DCR = DCR_DBL | DCR_DBA;
   dmaStartAcquisition(samples, ARRAY_LEN(samples));
   icuStartCapture(&ICUD1);
   //icuEnableNotifications(&ICUD1);
@@ -99,8 +101,11 @@ static noreturn void blinker (void *arg)
   (void)arg;
   chRegSetThreadName("blinker");
   while (true) {
-    for (size_t i=0; i< 4; i++) {
+    for (size_t i=0; i< 2; i++) {
       DebugTrace ("samples[%ul] = %u ISR has %s fired", i, samples[i], dmaIsrHasFired ? "" : "NOT");
+    }
+    for (size_t i=ARRAY_LEN(samples)-2; i<ARRAY_LEN(samples) ; i++) {
+      DebugTrace ("samples[%ul] = %u", i, samples[i]);
     }
     dmaIsrHasFired = false;
     palToggleLine(LINE_C00_LED1); 	
@@ -121,7 +126,7 @@ static bool dmaStart(void)
 			(stm32_dmaisr_t)icu_lld_serve_rx_interrupt,
 			(void *) &ICUD1);
   osalDbgAssert(!b, "stream already allocated");
-  dmaStreamSetPeripheral(ICU1_CH1_DMA_STREAM, &ICUD1.tim->CCR[ICU1_CHANNEL+1]);
+  dmaStreamSetPeripheral(ICU1_CH1_DMA_STREAM, &ICUD1.tim->DMAR);
   osalSysUnlock();
   
   return b;
