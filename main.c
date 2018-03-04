@@ -34,7 +34,7 @@
 
 
 
-static bool dmaIsrHasFired = false;
+static volatile bool dmaIsrHasFired = false;
 
 static bool dmaStart(void);
 static void dmaStop(void);
@@ -46,7 +46,7 @@ static void icu_lld_serve_rx_interrupt(ICUDriver *icup, uint32_t flags);
 
 static const ICUConfig icu1ch1_cfg = {
   .mode = ICU_INPUT_ACTIVE_HIGH,
-  .frequency = 10000,                                    /* 10kHz ICU clock frequency.   */
+  .frequency = 1000000,                                    /* 10kHz ICU clock frequency.   */
   .width_cb = NULL,
   .period_cb = NULL,
   .overflow_cb = NULL,
@@ -60,7 +60,7 @@ static const ICUConfig icu1ch1_cfg = {
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 
-static uint16_t samples[128] = {0};
+static uint16_t samples[128] = {0}; // took 0.0128 seconds to fill
 
 int main(void) {
 
@@ -79,7 +79,7 @@ int main(void) {
   consoleInit();
 
   initPotentiometre();
-  launchPwm(100, 100);
+  launchPwm(10000, 100);
   
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   dmaStart();
@@ -102,7 +102,7 @@ static noreturn void blinker (void *arg)
     for (size_t i=0; i< 4; i++) {
       DebugTrace ("samples[%ul] = %u ISR has %s fired", i, samples[i], dmaIsrHasFired ? "" : "NOT");
     }
-
+    dmaIsrHasFired = false;
     palToggleLine(LINE_C00_LED1); 	
     chThdSleepMilliseconds(500);
   }
