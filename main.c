@@ -155,6 +155,8 @@ static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
 
 #if STM32_DMA_ADVANCED
   dmamode |= (STM32_DMA_CR_PBURST_INCR4 | STM32_DMA_CR_MBURST_INCR4);
+  dmaStreamSetFIFO(dmastream, STM32_DMA_FCR_DMDIS |
+		   STM32_DMA_FCR_FTH_FULL);
 #endif
 
   
