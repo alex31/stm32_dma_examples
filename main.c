@@ -142,8 +142,6 @@ static void dmaStop(void)
 static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
 				const size_t depth)
 {
-  (void) widthsAndPeriods;
-  (void) depth;
   const stm32_dma_stream_t  *dmastream = ICU1_CH1_DMA_STREAM;
 
   uint32_t dmamode = STM32_DMA_CR_CHSEL(ICU1_CH1_DMA_CHANNEL) |
