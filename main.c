@@ -11,7 +11,7 @@
 #include "ttyConsole.h"
 #include "potentiometre.h"
 #include "pwm.h"
-
+#include "hal_dma.h"
 
 
 /*
@@ -80,6 +80,7 @@ int main(void) {
   consoleInit();
 
   initPotentiometre();
+
   launchPwm(10000, 100);
   
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
@@ -163,16 +164,12 @@ static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
   }
 
   
-
+  osalSysLock();
   
   dmaStreamSetMemory0(dmastream, widthsAndPeriods);
   dmaStreamSetTransactionSize(dmastream, depth);
   dmaStreamSetMode(dmastream, dmamode);
   dmaStreamEnable(dmastream);
-
-
-  osalSysLock();
-  
 
   osalSysUnlock();
 }
