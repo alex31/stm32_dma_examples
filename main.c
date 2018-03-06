@@ -152,9 +152,9 @@ static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
     STM32_DMA_CR_DMEIE       | STM32_DMA_CR_TEIE; // direct mode error and transfert error ISR enable
 
 #if STM32_DMA_ADVANCED
-  dmamode |= (STM32_DMA_CR_PBURST_INCR4 | STM32_DMA_CR_MBURST_INCR4);
-  dmaStreamSetFIFO(dmastream, STM32_DMA_FCR_DMDIS |
-		   STM32_DMA_FCR_FTH_FULL);
+  /* dmamode |= (STM32_DMA_CR_PBURST_INCR4 | STM32_DMA_CR_MBURST_INCR4); */
+  /* dmaStreamSetFIFO(dmastream, STM32_DMA_FCR_DMDIS | */
+  /* 		   STM32_DMA_FCR_FTH_FULL); */
 #endif
 
   
@@ -165,16 +165,14 @@ static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
   
 
   
-  dmaStreamSetMemory0(dmastream, widthsAndPeriods);
-  dmaStreamSetTransactionSize(dmastream, depth);
-  dmaStreamSetMode(dmastream, dmamode);
-  dmaStreamEnable(dmastream);
+  osalSysLock(); {
 
-
-  osalSysLock();
-  
-
-  osalSysUnlock();
+    dmaStreamSetMemory0(dmastream, widthsAndPeriods);
+    dmaStreamSetTransactionSize(dmastream, depth);
+    dmaStreamSetMode(dmastream, dmamode);
+    dmaStreamEnable(dmastream);
+    
+  } osalSysUnlock();
 }
 
 
