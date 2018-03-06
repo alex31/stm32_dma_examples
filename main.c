@@ -43,7 +43,7 @@ static void dmaStartAcquisition(uint16_t *widthOrPeriod,
 
 static volatile bool dmaIsrHasFired = false;
 
-static DMAConfig dmaConfig = {
+static const DMAConfig dmaConfig = {
   .controller = ICU1_CH1_DMA_CONTROLER,
   .stream = ICU1_CH1_DMA_STREAM,
   .channel = ICU1_CH1_DMA_CHANNEL,
@@ -64,7 +64,7 @@ static DMAConfig dmaConfig = {
   .fifo = 2
 };
 
-
+static DMADriver dmad;
 
 static const ICUConfig icu1ch1_cfg = {
   .mode = ICU_INPUT_ACTIVE_HIGH,
@@ -140,18 +140,18 @@ static noreturn void blinker (void *arg)
 static bool dmaStart(void)
 {
  
-  return dma_start(&dmaConfig);
+  return dma_start(&dmad, &dmaConfig);
 }
 
 static void dmaStop(void)
 {
-   dma_stop(&dmaConfig);
+   dma_stop(&dmad);
 }
 
 static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
 				const size_t depth)
 {
-  dma_start_ptransfert(&dmaConfig, widthsAndPeriods, depth);
+  dma_start_ptransfert(&dmad, widthsAndPeriods, depth);
 }
 
 
