@@ -59,9 +59,9 @@ static DMAConfig dmaConfig = {
   .inc_memory_addr = true,
   .circular = true,
   .isr_flags = STM32_DMA_CR_TCIE | STM32_DMA_CR_HTIE | STM32_DMA_CR_DMEIE | STM32_DMA_CR_TEIE,
-  .pburst = 0,
-  .mburst = 0,
-  .fifo = 0
+  .pburst = 4,
+  .mburst = 4,
+  .fifo = 2
 };
 
 
