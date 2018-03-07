@@ -56,13 +56,12 @@ static const DMAConfig dmaConfig = {
   .irq_priority = ICU1_CH1_DMA_IRQ_PRIORITY,
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
   .periph_addr = &TIM1->DMAR,
-  .direction = STM32_DMA_CR_DIR_P2M,
+  .direction = DMA_DIR_P2M,
   .psize = 2,
   .msize = 2,
   .inc_peripheral_addr = false,
   .inc_memory_addr = true,
   .circular = true,
-  .isr_flags = STM32_DMA_CR_TCIE | STM32_DMA_CR_HTIE | STM32_DMA_CR_DMEIE | STM32_DMA_CR_TEIE,
   .error_cb = &error_cb,
   .end_cb = &end_cb,
   .pburst = 4,
@@ -131,10 +130,10 @@ static noreturn void blinker (void *arg)
   chRegSetThreadName("blinker");
   while (true) {
     for (size_t i=0; i< 2; i++) {
-      DebugTrace ("samples[%lu] = %u err=%u", i, samples[i], last_err);
+      DebugTrace ("samples[%u] = %u err=%u", i, samples[i], last_err);
     }
     for (size_t i=ARRAY_LEN(samples)-2; i<ARRAY_LEN(samples) ; i++) {
-      DebugTrace ("samples[%ul] = %u half_buffer=%p half_index=%u", i, samples[i],
+      DebugTrace ("samples[%u] = %u half_buffer=%p half_index=%u", i, samples[i],
 		  last_half_buffer, last_half_buffer-samples);
     }
     palToggleLine(LINE_C00_LED1); 	
