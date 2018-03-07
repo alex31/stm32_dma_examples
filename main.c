@@ -36,13 +36,17 @@
 // first register to get is CCR1
 #define DCR_DBA			(((uint32_t *) (&ICUD1.tim->CCR) - ((uint32_t *) ICUD1.tim))) 
 
-static void icu_lld_serve_rx_interrupt(void *icup, uint32_t flags);
-static bool dmaStart(void);
-static void dmaStop(void);
-static void dmaStartAcquisition(uint16_t *widthOrPeriod,
+static void initDma(void);
+static bool startDma(void);
+static void stopDma(void);
+static void startDmaAcquisition(uint16_t *widthOrPeriod,
 				size_t depth);
+static void error_cb(DMADriver *dmap, dmaerrormask_t err);
+static void end_cb(DMADriver *dmap, void *buffer, const size_t num);
 
-static volatile bool dmaIsrHasFired = false;
+static volatile dmaerrormask_t last_err = 0;
+static volatile uint16_t *last_half_buffer = NULL;
+static volatile size_t last_num = 0;
 
 static const DMAConfig dmaConfig = {
   .controller = ICU1_CH1_DMA_CONTROLER,
@@ -50,8 +54,6 @@ static const DMAConfig dmaConfig = {
   .channel = ICU1_CH1_DMA_CHANNEL,
   .dma_priority =  ICU1_CH1_DMA_PRIORITY,
   .irq_priority = ICU1_CH1_DMA_IRQ_PRIORITY,
-  .serve_dma_isr = &icu_lld_serve_rx_interrupt,
-  .serve_dma_isr_arg = &ICUD1,
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
   .periph_addr = &TIM1->DMAR,
   .direction = STM32_DMA_CR_DIR_P2M,
@@ -61,12 +63,14 @@ static const DMAConfig dmaConfig = {
   .inc_memory_addr = true,
   .circular = true,
   .isr_flags = STM32_DMA_CR_TCIE | STM32_DMA_CR_HTIE | STM32_DMA_CR_DMEIE | STM32_DMA_CR_TEIE,
+  .error_cb = &error_cb,
+  .end_cb = &end_cb,
   .pburst = 4,
   .mburst = 4,
   .fifo = 2
 };
 
-static DMADriver dmad;
+static DMADriver dmap;
 
 static const ICUConfig icu1ch1_cfg = {
   .mode = ICU_INPUT_ACTIVE_HIGH,
@@ -99,7 +103,8 @@ int main(void) {
   halInit();
   chSysInit();
   initHeap();
-
+  initDma();
+  
   consoleInit();
 
   initPotentiometre();
@@ -107,10 +112,10 @@ int main(void) {
   launchPwm(10000, 100);
   
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
-  dmaStart();
+  startDma();
   icuStart(&ICUD1, &icu1ch1_cfg);
   ICUD1.tim->DCR = DCR_DBL | DCR_DBA;
-  dmaStartAcquisition(samples, ARRAY_LEN(samples));
+  startDmaAcquisition(samples, ARRAY_LEN(samples));
   icuStartCapture(&ICUD1);
   //icuEnableNotifications(&ICUD1);
   
@@ -126,61 +131,53 @@ static noreturn void blinker (void *arg)
   chRegSetThreadName("blinker");
   while (true) {
     for (size_t i=0; i< 2; i++) {
-      DebugTrace ("samples[%ul] = %u ISR has %s fired", i, samples[i], dmaIsrHasFired ? "" : "NOT");
+      DebugTrace ("samples[%lu] = %u err=%u", i, samples[i], last_err);
     }
     for (size_t i=ARRAY_LEN(samples)-2; i<ARRAY_LEN(samples) ; i++) {
-      DebugTrace ("samples[%ul] = %u", i, samples[i]);
+      DebugTrace ("samples[%ul] = %u half_buffer=%p half_index=%u", i, samples[i],
+		  last_half_buffer, last_half_buffer-samples);
     }
-    dmaIsrHasFired = false;
     palToggleLine(LINE_C00_LED1); 	
     chThdSleepMilliseconds(500);
   }
 }
 
 
-
-static bool dmaStart(void)
+static void initDma(void)
 {
- 
-  return dma_start(&dmad, &dmaConfig);
+   dmaObjectInit(&dmap);
 }
 
-static void dmaStop(void)
+static bool startDma(void)
 {
-   dma_stop(&dmad);
+   return dmaStart(&dmap, &dmaConfig);
 }
 
-static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
+static void stopDma(void)
+{
+   dmaStop(&dmap);
+}
+
+static void startDmaAcquisition(uint16_t *widthsAndPeriods,
 				const size_t depth)
 {
-  dma_start_ptransfert(&dmad, widthsAndPeriods, depth);
+  dmaStartPtransfert(&dmap, widthsAndPeriods, depth);
 }
 
 
 
-static void icu_lld_serve_rx_interrupt(void *icup, uint32_t flags)
+static void error_cb(DMADriver *_dmap, dmaerrormask_t err)
 {
-  (void) icup;
-  dmaIsrHasFired = true;
-  /* DMA errors handling.*/
-  if ((flags & (STM32_DMA_ISR_TEIF | STM32_DMA_ISR_DMEIF)) != 0) {
-    /* DMA, this could help only if the DMA tries to access an unmapped
-       address space or violates alignment rules.*/
-    chSysHalt ("icu_lld_serve_rx_interrupt dma error");
-  }
-  else {
-    /* /\* It is possible that the conversion group has already be reset by the */
-    /*    ICU error handler, in this case this interrupt is spurious.*\/ */
-    /* if (icup->grpp != NULL) { */
+  (void) _dmap;
+  last_err = err;
+}
 
-    /*   if ((flags & STM32_DMA_ISR_TCIF) != 0) { */
-    /*     /\* Transfer complete processing.*\/ */
-    /*     _icu_isr_full_code(icup); */
-    /*   } */
-    /*   else if ((flags & STM32_DMA_ISR_HTIF) != 0) { */
-    /*     /\* Half transfer processing.*\/ */
-    /*     _icu_isr_half_code(icup); */
-    /*   } */
-    /* } */
-  }
+static void end_cb(DMADriver *_dmap, void *buffer, size_t num)
+{
+  (void) _dmap;
+
+  if (buffer != samples)
+    last_half_buffer = (uint16_t *) buffer;
+
+  last_num = num;
 }
