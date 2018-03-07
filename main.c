@@ -41,12 +41,16 @@ static bool startDma(void);
 static void stopDma(void);
 static void startDmaAcquisition(uint16_t *widthOrPeriod,
 				size_t depth);
+static void oneShotDmaAcquisition(uint16_t *widthsAndPeriods,
+				  const size_t depth);
+
 static void error_cb(DMADriver *dmap, dmaerrormask_t err);
 static void end_cb(DMADriver *dmap, void *buffer, const size_t num);
 
 static volatile dmaerrormask_t last_err = 0;
 static volatile uint16_t *last_half_buffer = NULL;
 static volatile size_t last_num = 0;
+static volatile size_t cb_count = 0;
 
 static const DMAConfig dmaConfig = {
   .controller = ICU1_CH1_DMA_CONTROLER,
@@ -61,13 +65,13 @@ static const DMAConfig dmaConfig = {
   .msize = 2,
   .inc_peripheral_addr = false,
   .inc_memory_addr = true,
-  .circular = true,
-  .isr_flags = STM32_DMA_CR_TCIE | STM32_DMA_CR_HTIE | STM32_DMA_CR_DMEIE | STM32_DMA_CR_TEIE,
+  .circular = false,
+  .isr_flags = STM32_DMA_CR_TCIE | STM32_DMA_CR_DMEIE | STM32_DMA_CR_TEIE,
   .error_cb = &error_cb,
   .end_cb = &end_cb,
-  .pburst = 4,
-  .mburst = 4,
-  .fifo = 2
+  .pburst = 0,
+  .mburst = 0,
+  .fifo = 0
 };
 
 static DMADriver dmap;
@@ -87,6 +91,9 @@ static const ICUConfig icu1ch1_cfg = {
 
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
+
+static THD_WORKING_AREA(waSyncDmaTest, 512);
+static noreturn void syncDmaTest (void *arg);
 
 static uint16_t samples[128] __attribute__((aligned(4))) = {0}; // took 0.0128 seconds to fill
 
@@ -115,8 +122,8 @@ int main(void) {
   startDma();
   icuStart(&ICUD1, &icu1ch1_cfg);
   ICUD1.tim->DCR = DCR_DBL | DCR_DBA;
-  startDmaAcquisition(samples, ARRAY_LEN(samples));
   icuStartCapture(&ICUD1);
+  chThdCreateStatic(waSyncDmaTest, sizeof(waSyncDmaTest), NORMALPRIO, syncDmaTest, NULL);
   //icuEnableNotifications(&ICUD1);
   
   consoleLaunch();  
@@ -131,14 +138,29 @@ static noreturn void blinker (void *arg)
   chRegSetThreadName("blinker");
   while (true) {
     for (size_t i=0; i< 2; i++) {
-      DebugTrace ("samples[%lu] = %u err=%u", i, samples[i], last_err);
+      DebugTrace ("samples[%u] = %u err=%u cnt=%u", i, samples[i], last_err, cb_count);
     }
     for (size_t i=ARRAY_LEN(samples)-2; i<ARRAY_LEN(samples) ; i++) {
-      DebugTrace ("samples[%ul] = %u half_buffer=%p half_index=%u", i, samples[i],
-		  last_half_buffer, last_half_buffer-samples);
+      if (last_num) {
+	DebugTrace ("samples[%ul] = %u half_buffer=%p half_index=%u last_num=%u", i, samples[i],
+		    last_half_buffer, last_half_buffer-samples, last_num);
+      } else {
+	DebugTrace ("samples[%ul] = %u , Cb not called", i, samples[i]);
+      }
     }
-    palToggleLine(LINE_C00_LED1); 	
     chThdSleepMilliseconds(500);
+  }
+}
+
+static noreturn void syncDmaTest (void *arg)
+{
+
+  (void)arg;
+  chRegSetThreadName("syncDmaTest");
+  while (true) {
+    palToggleLine(LINE_C00_LED1); 	
+    oneShotDmaAcquisition(samples, ARRAY_LEN(samples));
+    chThdSleepMilliseconds(1000);
   }
 }
 
@@ -164,6 +186,12 @@ static void startDmaAcquisition(uint16_t *widthsAndPeriods,
   dmaStartPtransfert(&dmap, widthsAndPeriods, depth);
 }
 
+static void oneShotDmaAcquisition(uint16_t *widthsAndPeriods,
+				  const size_t depth)
+{
+  dmaPtransfert(&dmap, widthsAndPeriods, depth);
+}
+
 
 
 static void error_cb(DMADriver *_dmap, dmaerrormask_t err)
@@ -180,4 +208,5 @@ static void end_cb(DMADriver *_dmap, void *buffer, size_t num)
     last_half_buffer = (uint16_t *) buffer;
 
   last_num = num;
+  cb_count++;
 }
