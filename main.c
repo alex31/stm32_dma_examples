@@ -28,8 +28,9 @@
 
 #define ICU1_CH1_DMA_CONTROLER		2
 #define ICU1_CH1_DMA_STREAM		6
-#define ICU1_CH1_DMA_PRIORITY	6
-#define ICU1_CH1_DMA_CHANNEL	0
+#define ICU1_CH1_DMA_IRQ_PRIORITY	6
+#define ICU1_CH1_DMA_PRIORITY		2
+#define ICU1_CH1_DMA_CHANNEL		0
 #define ICU1_CHANNEL		ICU_CHANNEL_1
 #define DCR_DBL			(1 << 8) // 2 transfert
 // first register to get is CCR1
@@ -47,7 +48,8 @@ static const DMAConfig dmaConfig = {
   .controller = ICU1_CH1_DMA_CONTROLER,
   .stream = ICU1_CH1_DMA_STREAM,
   .channel = ICU1_CH1_DMA_CHANNEL,
-  .priority = ICU1_CH1_DMA_PRIORITY,
+  .dma_priority =  ICU1_CH1_DMA_PRIORITY,
+  .irq_priority = ICU1_CH1_DMA_IRQ_PRIORITY,
   .serve_dma_isr = &icu_lld_serve_rx_interrupt,
   .serve_dma_isr_arg = &ICUD1,
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
