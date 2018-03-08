@@ -43,9 +43,8 @@ static const DMAConfig dmaConfig = {
   .inc_peripheral_addr = true,
   .inc_memory_addr = true,
   .circular = false,
-  .pburst = 0,
-  .mburst = 0,
-  .fifo = 0
+  .mburst = 4,
+  .fifo = 4
 };
 
 static DMADriver dmap;
