@@ -59,7 +59,7 @@ static const DMAConfig dmaConfig = {
   .dma_priority =  ICU1_CH1_DMA_PRIORITY,
   .irq_priority = ICU1_CH1_DMA_IRQ_PRIORITY,
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
-  .periph_addr = &TIM1->DMAR,
+  //  .periph_addr = &TIM1->DMAR,
   .direction = DMA_DIR_P2M,
   .psize = 2,
   .msize = 2,
@@ -182,13 +182,13 @@ static void stopDma(void)
 static void startDmaAcquisition(uint16_t *widthsAndPeriods,
 				const size_t depth)
 {
-  dmaStartPtransfert(&dmap, widthsAndPeriods, depth);
+  dmaStartTransfert(&dmap, &TIM1->DMAR, widthsAndPeriods, depth);
 }
 
 static void oneShotDmaAcquisition(uint16_t *widthsAndPeriods,
 				  const size_t depth)
 {
-  dmaPtransfert(&dmap, widthsAndPeriods, depth);
+  dmaTransfert(&dmap, &TIM1->DMAR, widthsAndPeriods, depth);
 }
 
 
