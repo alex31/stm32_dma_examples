@@ -6,11 +6,11 @@
 #include <hal.h>
 #include <stdnoreturn.h>
 #include <math.h>
+#include <string.h>
 #include "globalVar.h"
 #include "stdutil.h"
 #include "ttyConsole.h"
 #include "hal_dma.h"
-
 
 /*
 
@@ -35,7 +35,7 @@ static const DMAConfig dmaConfig = {
   .controller = M2M_DMA_CONTROLER,
   .stream = M2M_DMA_STREAM,
   .channel = M2M_DMA_CHANNEL,
-  .dma_priority =  M2M_DMA_PRIORITY,
+  .dma_priority = M2M_DMA_PRIORITY,
   .irq_priority = M2M_DMA_IRQ_PRIORITY,
   .direction = DMA_DIR_M2M,
   .psize = 4,
@@ -95,7 +95,7 @@ static noreturn void blinker (void *arg)
     for (size_t i=0; i<ARRAY_LEN(bufferTo); i+=50) {
       DebugTrace ("To[%u] = %lu", i, bufferTo[i]);
     }
-
+    memset (bufferTo, 0, sizeof(bufferTo));
     palToggleLine(LINE_C00_LED1);
     chThdSleepMilliseconds(500);
   }
