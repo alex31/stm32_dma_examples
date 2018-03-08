@@ -20,6 +20,10 @@
   ° connecter B06 (uart1_tx) sur ftdi rx
   ° connecter B07 (uart1_rx) sur ftdi tx
   ° connecter C00 sur led1 
+  ° connecter B00 sur led5
+  ° connecter B01 sur led6
+  ° connecter B02 sur led7 
+  ° connecter B03 sur led8 
  */
 
 
