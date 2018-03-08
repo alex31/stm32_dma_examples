@@ -24,10 +24,10 @@
  */
 
 
-#define M2M_DMA_CONTROLER		2
+#define M2M_DMA_CONTROLER	2
 #define M2M_DMA_STREAM		6
 #define M2M_DMA_IRQ_PRIORITY	6
-#define M2M_DMA_PRIORITY		2
+#define M2M_DMA_PRIORITY	2
 #define M2M_DMA_CHANNEL		0
 
 
@@ -92,7 +92,7 @@ static noreturn void blinker (void *arg)
   (void)arg;
   chRegSetThreadName("blinker");
   while (true) {
-    dmaMtransfert(&dmap, bufferFrom, bufferTo, ARRAY_LEN(bufferFrom));
+    dmaTransfert(&dmap, bufferFrom, bufferTo, ARRAY_LEN(bufferFrom));
     for (size_t i=0; i<ARRAY_LEN(bufferTo); i+=50) {
       DebugTrace ("To[%u] = %lu", i, bufferTo[i]);
     }
