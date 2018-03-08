@@ -148,7 +148,6 @@ CSRC = $(STARTUPSRC) \
        $(VARIOUS)/hal_dma.c \
        ttyConsole.c \
        globalVar.c \
-       potentiometre.c \
        pwm.c \
        main.c
 
