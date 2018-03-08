@@ -64,9 +64,8 @@ static const DMAConfig dmaConfig = {
   .circular = true,
   .error_cb = &error_cb,
   .end_cb = &end_cb,
-  .pburst = 4,
-  .mburst = 4,
-  .fifo = 2
+  .mburst = 8,
+  .fifo = 4
 };
 
 static DMADriver dmap;
