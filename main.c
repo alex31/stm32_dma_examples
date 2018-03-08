@@ -188,7 +188,10 @@ static void startDmaAcquisition(uint16_t *widthsAndPeriods,
 static void oneShotDmaAcquisition(uint16_t *widthsAndPeriods,
 				  const size_t depth)
 {
-  dmaTransfert(&dmap, &TIM1->DMAR, widthsAndPeriods, depth);
+  msg_t status = dmaTransfertTimeout(&dmap, &TIM1->DMAR, widthsAndPeriods, depth, TIME_MS2I(10));
+  if (status != MSG_OK) {
+    DebugTrace ("DMA Time OUT");
+  }
 }
 
 
