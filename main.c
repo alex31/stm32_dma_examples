@@ -182,12 +182,12 @@ static noreturn void dht22Acquisition (void *arg)
     for (size_t i=0; i<ARRAY_LEN(widths); i++) {
       const timer_reg_t width = widths[i];
       //DebugTrace ("width[%u] = %lu bc=%u", i, width, bit_counter);
-      if (width >= DHT_START_BIT_WIDTH)
+      if (width >= DHT_START_BIT_WIDTH) {
 	/* starting bit resetting the bit counter */
 	bit_counter = 0;
-      else 
+      } else  {
 	fhtRegBB[bit_counter++] = width >= DHT_INTER_BIT_WIDTH;
-
+      }
       // if frame is completely acquired, exit loop 
       if (bit_counter == 40)
 	break;
