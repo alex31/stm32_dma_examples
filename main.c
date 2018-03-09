@@ -24,19 +24,13 @@
  */
 
 
-#define M2M_DMA_CONTROLER	2
-#define M2M_DMA_STREAM		6
-#define M2M_DMA_IRQ_PRIORITY	6
-#define M2M_DMA_PRIORITY	2
-#define M2M_DMA_CHANNEL		0
 
 
 static const DMAConfig dmaConfig = {
-  .controller = M2M_DMA_CONTROLER,
-  .stream = M2M_DMA_STREAM,
-  .channel = M2M_DMA_CHANNEL,
-  .dma_priority = M2M_DMA_PRIORITY,
-  .irq_priority = M2M_DMA_IRQ_PRIORITY,
+  .stream = STM32_M2M_DMA_STREAM,
+  .channel = STM32_M2M_DMA_CHANNEL,
+  .dma_priority = STM32_M2M_DMA_PRIORITY,
+  .irq_priority =STM32_M2M_DMA_IRQ_PRIORITY,
   .direction = DMA_DIR_M2M,
   .psize = 4,
   .msize = 4,

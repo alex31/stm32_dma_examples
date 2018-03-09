@@ -203,6 +203,7 @@
 #define STM32_ICU_TIM8_IRQ_PRIORITY         7
 #define STM32_ICU_TIM9_IRQ_PRIORITY         7
 
+
 /*
  * MAC driver system settings.
  */
@@ -333,6 +334,15 @@
 #define STM32_USB_OTG_THREAD_PRIO           LOWPRIO
 #define STM32_USB_OTG_THREAD_STACK_SIZE     128
 #define STM32_USB_OTGFIFO_FILL_BASEPRI      0
+
+/*
+ * Memory to Memory DMA settings
+ */
+#define STM32_M2M_DMA_STREAM		STM32_DMA_STREAM_ID(2, 6)
+#define STM32_M2M_DMA_IRQ_PRIORITY	6
+#define STM32_M2M_DMA_PRIORITY	2
+#define STM32_M2M_DMA_CHANNEL		0
+
 
 /*
  * WDG driver system settings.
