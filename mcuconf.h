@@ -232,6 +232,10 @@
 #define STM32_PWM_TIM5_IRQ_PRIORITY         7
 #define STM32_PWM_TIM8_IRQ_PRIORITY         7
 #define STM32_PWM_TIM9_IRQ_PRIORITY         7
+#define STM32_PWM1_UP_DMA_STREAM	    STM32_DMA_STREAM_ID(2,5)
+#define STM32_PWM1_UP_DMA_IRQ_PRIORITY	    6
+#define STM32_PWM1_UP_DMA_PRIORITY	    2
+#define STM32_PWM1_UP_DMA_CHANNEL	    6
 
 /*
  * SDC driver system settings.

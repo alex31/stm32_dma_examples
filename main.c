@@ -27,18 +27,12 @@
  */
 
 
-#define TIM1_CH1_DMA_CONTROLER		2
-#define TIM1_CH1_DMA_STREAM		5
-#define TIM1_CH1_DMA_IRQ_PRIORITY	6
-#define TIM1_CH1_DMA_PRIORITY		2
-#define TIM1_CH1_DMA_CHANNEL		6
 
 static const DMAConfig dmaConfig = {
-  .controller = TIM1_CH1_DMA_CONTROLER,
-  .stream = TIM1_CH1_DMA_STREAM,
-  .channel = TIM1_CH1_DMA_CHANNEL,
-  .dma_priority =  TIM1_CH1_DMA_PRIORITY,
-  .irq_priority = TIM1_CH1_DMA_IRQ_PRIORITY,
+  .stream = STM32_PWM1_UP_DMA_STREAM,
+  .channel = STM32_PWM1_UP_DMA_CHANNEL,
+  .dma_priority =  STM32_PWM1_UP_DMA_PRIORITY,
+  .irq_priority = STM32_PWM1_UP_DMA_IRQ_PRIORITY,
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
   //  .periph_addr = &TIM1->DMAR,
   .direction = DMA_DIR_M2P,
