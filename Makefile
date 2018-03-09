@@ -148,8 +148,6 @@ CSRC = $(STARTUPSRC) \
        $(VARIOUS)/hal_dma.c \
        ttyConsole.c \
        globalVar.c \
-       potentiometre.c \
-       pwm.c \
        main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
