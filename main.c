@@ -40,10 +40,6 @@
 
 #define    ICU_TIM_FREQ         1e6 // 1Mhz
 #define    ICU1_CHANNEL		ICU_CHANNEL_1
-#define    DCR_DBL		((2-1) << 8) // 2 transfert
-// first register to get is CCR1
-#define DCR_DBA			(((uint32_t *) (&ICUD1.tim->CCR) - ((uint32_t *) ICUD1.tim))) 
-
 
 static void error_cb(DMADriver *dmap, dmaerrormask_t err);
 static volatile dmaerrormask_t last_err = 0;
@@ -58,6 +54,15 @@ typedef union {
     uint8_t raw [5];
 }   DhtData;
 
+// icucnt_t is 32 bits wide for 32bits timer, but we use TIM1 which is 16 bits timer
+// let's optimize
+typedef  uint16_t timer_reg_t;
+
+// 48 is bigger than needed 40, but burst mode implies size of buffer to be multiple of size of
+// burst data (4*2 = 8) 
+timer_reg_t widths[48] __attribute__((aligned(4))); 
+
+ 
 static const DMAConfig dmaConfig = {
   .stream = STM32_ICU1_CH1_DMA_STREAM,
   .channel = STM32_ICU1_CH1_DMA_CHANNEL,
@@ -66,16 +71,16 @@ static const DMAConfig dmaConfig = {
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
   //  .periph_addr = &TIM1->DMAR,
   .direction = DMA_DIR_P2M,
-  .psize = 4,
-  .msize = 4,
+  .psize = sizeof(timer_reg_t), // if we change for a 32 bit timer just have to change
+  .msize = sizeof(timer_reg_t), // type of width array
   .inc_peripheral_addr = false,
   .inc_memory_addr = true,
   .circular = false,
   .error_cb = &error_cb,
   .end_cb = NULL,
   .pburst = 0,
-  .mburst = 0,
-  .fifo = 0
+  .mburst = 4,
+  .fifo = 4
 };
 
 static DMADriver dmap;
@@ -89,8 +94,6 @@ static const ICUConfig icu1ch1_cfg = {
   .channel = ICU1_CHANNEL,
   .dier = TIM_DIER_CC1DE | TIM_DIER_TDE
 };
-
-
 
 
 static THD_WORKING_AREA(waBlinker, 512);
@@ -119,7 +122,6 @@ int main(void) {
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   dmaStart(&dmap, &dmaConfig);
   icuStart(&ICUD1, &icu1ch1_cfg);
-  ICUD1.tim->DCR = DCR_DBL | DCR_DBA;
   icuStartCapture(&ICUD1);
   chThdCreateStatic(waDht22Acquisition, sizeof(waDht22Acquisition), NORMALPRIO, dht22Acquisition, NULL);
   
@@ -139,7 +141,6 @@ static noreturn void blinker (void *arg)
   }
 }
 
-icucnt_t widthAndPeriods[86] __attribute__((aligned(4))); 
 static noreturn void dht22Acquisition (void *arg)
 {
   (void)arg;
@@ -164,12 +165,11 @@ static noreturn void dht22Acquisition (void *arg)
 		   | PAL_STM32_PUPDR_PULLUP);
 
     // launch a DMA transfert from timer in input capure mode and memory
-    msg_t status = dmaTransfertTimeout(&dmap, &TIM1->DMAR, widthAndPeriods, ARRAY_LEN(widthAndPeriods),
-				       TIME_MS2I(20));
+    // we don't verify return value, because depending on how bit N°1 is found
+    // it's normal not to get 44 values and falling in TIME_OUT
+    dmaTransfertTimeout(&dmap, &ICUD1.tim->CCR[1], widths, ARRAY_LEN(widths),
+			TIME_MS2I(20));
 
-    if (status != MSG_OK) {
-      DebugTrace ("DMA Time OUT");
-    }
    if (last_err != MSG_OK) {
       DebugTrace ("DMA Error");
       last_err = 0;
@@ -179,9 +179,9 @@ static noreturn void dht22Acquisition (void *arg)
     // generate binary stream using pulse width registered by ICU+DMA
     uint8_t bit_counter=0;
 
-    for (size_t i=0; i<ARRAY_LEN(widthAndPeriods)/2; i++) {
-      const icucnt_t width = widthAndPeriods[1+(i*2)];
-      //      DebugTrace ("width[%u] = %lu bc=%u", i, width, bit_counter);
+    for (size_t i=0; i<ARRAY_LEN(widths); i++) {
+      const timer_reg_t width = widths[i];
+      //DebugTrace ("width[%u] = %lu bc=%u", i, width, bit_counter);
       if (width >= DHT_START_BIT_WIDTH)
 	/* starting bit resetting the bit counter */
 	bit_counter = 0;
