@@ -49,11 +49,10 @@ static volatile uint16_t *last_half_buffer = NULL;
 static volatile size_t last_num = 0;
 
 static const DMAConfig dmaConfig = {
-  .controller = ICU1_CH1_DMA_CONTROLER,
-  .stream = ICU1_CH1_DMA_STREAM,
-  .channel = ICU1_CH1_DMA_CHANNEL,
-  .dma_priority =  ICU1_CH1_DMA_PRIORITY,
-  .irq_priority = ICU1_CH1_DMA_IRQ_PRIORITY,
+  .stream = STM32_ICU1_CH1_DMA_STREAM,
+  .channel = STM32_ICU1_CH1_DMA_CHANNEL,
+  .dma_priority = STM32_ICU1_CH1_DMA_PRIORITY,
+  .irq_priority = STM32_ICU1_CH1_DMA_IRQ_PRIORITY,
   //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
   //  .periph_addr = &TIM1->DMAR,
   .direction = DMA_DIR_P2M,

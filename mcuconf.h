@@ -202,6 +202,10 @@
 #define STM32_ICU_TIM5_IRQ_PRIORITY         7
 #define STM32_ICU_TIM8_IRQ_PRIORITY         7
 #define STM32_ICU_TIM9_IRQ_PRIORITY         7
+#define STM32_ICU1_CH1_DMA_STREAM           STM32_DMA_STREAM_ID(2, 6)
+#define STM32_ICU1_CH1_DMA_IRQ_PRIORITY     6
+#define STM32_ICU1_CH1_DMA_PRIORITY         2
+#define STM32_ICU1_CH1_DMA_CHANNEL          0
 
 /*
  * MAC driver system settings.
