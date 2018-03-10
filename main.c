@@ -13,11 +13,6 @@
 #include "hal_dma.h"
 
 /*
-
-  ° connecter A04 (ADC1_IN4) sur le potentiomètre à bouton
-  ° laisser le jumper entre +3.3V et TOPs pour ce potentiomètre
-  ° connecter A15 sur led8 
-  ° connecter A15 sur A08 : rebouclage PWM vers ICU
   ° connecter B06 (uart1_tx) sur ftdi rx
   ° connecter B07 (uart1_rx) sur ftdi tx
   ° connecter C00 sur led1 
