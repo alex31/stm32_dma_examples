@@ -10,7 +10,7 @@
 #include "globalVar.h"
 #include "stdutil.h"
 #include "ttyConsole.h"
-#include "hal_dma.h"
+#include "hal_stm32_dma.h"
 
 /*
   ° connecter B06 (uart1_tx) sur ftdi rx
