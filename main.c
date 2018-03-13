@@ -11,7 +11,7 @@
 #include "ttyConsole.h"
 #include "potentiometre.h"
 #include "pwm.h"
-#include "hal_dma.h"
+#include "hal_stm32_dma.h"
 
 
 /*
