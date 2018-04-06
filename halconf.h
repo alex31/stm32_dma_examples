@@ -33,6 +33,25 @@
 
 #define   STM32_DMA_REQUIRED        TRUE
 
+/**
+ * @brief   Enables the DMA subsystem.
+ */
+#if !defined(STM32_DMA_USE_WAIT) || defined(__DOXYGEN__)
+#define   STM32_DMA_USE_WAIT       TRUE
+#endif
+
+#if !defined(STM32_DMA_USE_MUTUAL_EXCLUSION) || defined(__DOXYGEN__)
+#define STM32_DMA_USE_MUTUAL_EXCLUSION    TRUE
+#endif
+
+#if !defined(STM32_DMA_USE_ASYNC_TIMOUT) || defined(__DOXYGEN__)
+#define STM32_DMA_USE_ASYNC_TIMOUT FALSE
+#endif
+
+#define   STM32_DMA_REQUIRED        TRUE
+#undef STM32_DMA_DRIVER_EXT_INIT_HOOK
+
+
 
 /**
  * @brief   Enables the PAL subsystem.
