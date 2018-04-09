@@ -41,7 +41,13 @@
 #define    ICU_TIM_FREQ         1e6 // 1Mhz
 #define    ICU1_CHANNEL		ICU_CHANNEL_1
 
+
+static msg_t  mbBuf[64];
+static MAILBOX_DECL(mb, mbBuf, sizeof(mbBuf)/sizeof(mbBuf[0])); 
+
+
 static void error_cb(DMADriver *dmap, dmaerrormask_t err);
+static void end_cb(DMADriver *dmap, void *buffer, const size_t n);
 static volatile dmaerrormask_t last_err = 0;
 
 typedef union {
@@ -75,9 +81,9 @@ static const DMAConfig dmaConfig = {
   .msize = sizeof(timer_reg_t), // type of width array
   .inc_peripheral_addr = false,
   .inc_memory_addr = true,
-  .circular = false,
+  .circular = true,
   .error_cb = &error_cb,
-  .end_cb = NULL,
+  .end_cb = &end_cb,
   .pburst = 0,
   .mburst = 4,
   .fifo = 4
@@ -102,6 +108,9 @@ static noreturn void blinker (void *arg);
 static THD_WORKING_AREA(waDht22Acquisition, 512);
 static noreturn void dht22Acquisition (void *arg);
 
+static THD_WORKING_AREA(waDht22sendStartPulse, 512);
+static noreturn void dht22sendStartPulse (void *arg);
+
 int main(void) {
 
     /*
@@ -123,7 +132,11 @@ int main(void) {
   dmaStart(&dmap, &dmaConfig);
   icuStart(&ICUD1, &icu1ch1_cfg);
   icuStartCapture(&ICUD1);
+  // launch a DMA transfert in continuous mode
+  dmaStartTransfert(&dmap, &ICUD1.tim->CCR[1], widths, ARRAY_LEN(widths));
+
   chThdCreateStatic(waDht22Acquisition, sizeof(waDht22Acquisition), NORMALPRIO, dht22Acquisition, NULL);
+  chThdCreateStatic(waDht22sendStartPulse, sizeof(waDht22sendStartPulse), NORMALPRIO, dht22sendStartPulse, NULL);
   
   consoleLaunch();  
   chThdSleep(TIME_INFINITE); 
@@ -141,15 +154,11 @@ static noreturn void blinker (void *arg)
   }
 }
 
-static noreturn void dht22Acquisition (void *arg)
+
+static noreturn void dht22sendStartPulse (void *arg)
 {
   (void)arg;
-  chRegSetThreadName("dht22Acquisition");
-
-  static DhtData dhtData;
-
-  // use bitbanding capability of STM32F4 (see ref manuel RM090)
-  volatile uint32_t * const fhtRegBB = bb_sramp(&dhtData, 0);
+  chRegSetThreadName("dht22sendStartPulse");
 
   // when the pin is in gpio mode, should be forced LOW
   palClearLine(LINE_A08_ICU_IN);
@@ -164,57 +173,58 @@ static noreturn void dht22Acquisition (void *arg)
     palSetLineMode(LINE_A08_ICU_IN, PAL_MODE_ALTERNATE(AF_LINE_A08_ICU_IN)
 		   | PAL_STM32_PUPDR_PULLUP);
 
-    // launch a DMA transfert from timer in input capure mode and memory
-    // we don't verify return value, because depending on how bit N°1 is found
-    // it's normal not to get 44 values and falling in TIME_OUT
-    dmaTransfertTimeout(&dmap, &ICUD1.tim->CCR[1], widths, ARRAY_LEN(widths),
-			TIME_MS2I(20));
-
-   if (last_err != MSG_OK) {
-      DebugTrace ("DMA Error");
-      last_err = 0;
-    }
-     
-    
-    // generate binary stream using pulse width registered by ICU+DMA
-    uint8_t bit_counter=0;
-
-    for (size_t i=0; i<ARRAY_LEN(widths); i++) {
-      const timer_reg_t width = widths[i];
-      //DebugTrace ("width[%u] = %lu bc=%u", i, width, bit_counter);
-      if (width >= DHT_START_BIT_WIDTH) {
-	/* starting bit resetting the bit counter */
-	bit_counter = 0;
-      } else  {
-	fhtRegBB[bit_counter++] = width >= DHT_INTER_BIT_WIDTH;
-      }
-      // if frame is completely acquired, exit loop 
-      if (bit_counter == 40)
-	break;
-    }
-  
-  
-    // decode binary stream and generate numeric field
-
-    // DHT most significant bit is bit0, but MCU  most significant bit is bit7
-    // revbit reverse the bits order in a byte/halfword,word
-    for (uint i=0; i< sizeof(dhtData.raw); i++) {
-      dhtData.raw[i] = revbit(dhtData.raw[i]);
-    }
-    
-    // compute and compare checksum
-    if (dhtData.raw[4] == ((dhtData.raw[0] + dhtData.raw[1] +
-			    dhtData.raw[2] + dhtData.raw[3]) & 0xff)) {
-
-      const float humidity = dhtData.humidity / 10.0f;
-      const float temp = (dhtData.temp & 0x7fff) / ((dhtData.temp & 0x8000) ? - 10.0f : 10.0f);
-      chprintf(chp, "Temperature: %.2f C, Humidity Rate: %.2f %% \n\r",
-	       temp, humidity);
-    } else {
-      chprintf(chp, "Checksum FAILED!\n\r");
-    }
-    
     chThdSleepMilliseconds(1000);
+  }
+}
+
+
+
+static noreturn void dht22Acquisition (void *arg)
+{
+  (void)arg;
+  chRegSetThreadName("dht22Acquisition");
+
+  static DhtData dhtData;
+
+  // use bitbanding capability of STM32F4 (see ref manuel RM090)
+  volatile uint32_t * const fhtRegBB = bb_sramp(&dhtData, 0);
+
+  
+  // generate binary stream using pulse width registered by ICU+DMA
+  uint8_t bit_counter=0;
+  while (true) {
+    timer_reg_t width;
+    chMBFetchTimeout (&mb, (msg_t *) &width, TIME_INFINITE);
+    //DebugTrace ("width[%u] = %u", bit_counter, width);
+    if (width >= DHT_START_BIT_WIDTH) {
+      /* starting bit resetting the bit counter */
+      bit_counter = 0;
+    } else  {
+      fhtRegBB[bit_counter++] = width >= DHT_INTER_BIT_WIDTH;
+    }
+    // if frame is completely acquired, exit loop 
+    if (bit_counter == 40) {
+  
+      // decode binary stream and generate numeric field
+
+      // DHT most significant bit is bit0, but MCU  most significant bit is bit7
+      // revbit reverse the bits order in a byte/halfword,word
+      for (uint i=0; i< sizeof(dhtData.raw); i++) {
+	dhtData.raw[i] = revbit(dhtData.raw[i]);
+      }
+    
+      // compute and compare checksum
+      if (dhtData.raw[4] == ((dhtData.raw[0] + dhtData.raw[1] +
+			      dhtData.raw[2] + dhtData.raw[3]) & 0xff)) {
+
+	const float humidity = dhtData.humidity / 10.0f;
+	const float temp = (dhtData.temp & 0x7fff) / ((dhtData.temp & 0x8000) ? - 10.0f : 10.0f);
+	chprintf(chp, "Temperature: %.2f C, Humidity Rate: %.2f %% \n\r",
+		 temp, humidity);
+      } else {
+	chprintf(chp, "Checksum FAILED!\n\r");
+      }
+    }
   }
 }
 
@@ -225,5 +235,17 @@ static void error_cb(DMADriver *_dmap, dmaerrormask_t err)
 {
   (void) _dmap;
   last_err |= err;
+}
+
+static void end_cb(DMADriver *_dmap, void *buffer, const size_t n)
+{
+  (void) _dmap;
+  
+  chSysLockFromISR();
+  const timer_reg_t *bArray = (timer_reg_t *) buffer;
+  for (size_t i=0; i<n; i++) {
+    chMBPostI(&mb, (msg_t) bArray[i]);
+  }
+  chSysUnlockFromISR();
 }
 
