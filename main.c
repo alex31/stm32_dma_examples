@@ -42,7 +42,7 @@
 #define    ICU1_CHANNEL		ICU_CHANNEL_1
 
 
-static msg_t  mbBuf[64];
+static msg_t  mbBuf[128];
 static MAILBOX_DECL(mb, mbBuf, sizeof(mbBuf)/sizeof(mbBuf[0])); 
 
 
@@ -66,7 +66,7 @@ typedef  uint16_t timer_reg_t;
 
 // 48 is bigger than needed 40, but burst mode implies size of buffer to be multiple of size of
 // burst data (4*2 = 8) 
-timer_reg_t widths[48] __attribute__((aligned(4))); 
+timer_reg_t widths[96] __attribute__((aligned(8))); 
 
  
 static const DMAConfig dmaConfig = {
@@ -82,8 +82,9 @@ static const DMAConfig dmaConfig = {
   .inc_peripheral_addr = false,
   .inc_memory_addr = true,
   .circular = true,
-  .error_cb = &error_cb,
   .end_cb = &end_cb,
+  .error_cb = &error_cb,
+  .timeout = TIME_MS2I(1200),
   .pburst = 0,
   .mburst = 4,
   .fifo = 4
@@ -173,7 +174,7 @@ static noreturn void dht22sendStartPulse (void *arg)
     palSetLineMode(LINE_A08_ICU_IN, PAL_MODE_ALTERNATE(AF_LINE_A08_ICU_IN)
 		   | PAL_STM32_PUPDR_PULLUP);
 
-    chThdSleepMilliseconds(1000);
+    chThdSleepMilliseconds(2000);
   }
 }
 
@@ -194,8 +195,11 @@ static noreturn void dht22Acquisition (void *arg)
   uint8_t bit_counter=0;
   while (true) {
     timer_reg_t width;
-    chMBFetchTimeout (&mb, (msg_t *) &width, TIME_INFINITE);
-    //DebugTrace ("width[%u] = %u", bit_counter, width);
+    if (chMBFetchTimeout (&mb, (msg_t *) &width, TIME_MS2I(500)) != MSG_OK) {
+      DebugTrace ("***** TIMEOUT @ %u *******",  bit_counter);
+      chMBFetchTimeout (&mb, (msg_t *) &width, TIME_INFINITE);
+    }
+    DebugTrace ("width[%u] = %u", bit_counter, width);
     if (width >= DHT_START_BIT_WIDTH) {
       /* starting bit resetting the bit counter */
       bit_counter = 0;
@@ -224,6 +228,7 @@ static noreturn void dht22Acquisition (void *arg)
       } else {
 	chprintf(chp, "Checksum FAILED!\n\r");
       }
+      bit_counter = 0;
     }
   }
 }

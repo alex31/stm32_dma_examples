@@ -19,7 +19,7 @@ ifeq "$(GCCVERSIONGTEQ7)" "1"
 endif
 
 ifeq ($(USE_OPT),)
-  USE_OPT =  -Og  -ggdb3  -Wall -Wextra \
+  USE_OPT =  -O0  -ggdb3  -Wall -Wextra \
 	    -falign-functions=16 -fomit-frame-pointer \
 	    $(GCC_DIAG)
 endif
