@@ -199,7 +199,7 @@ static noreturn void dht22Acquisition (void *arg)
     //      DebugTrace ("***** TIMEOUT @ %u *******",  bit_counter);
     chMBFetchTimeout (&mb, (msg_t *) &width, TIME_INFINITE);
       //    }
-    DebugTrace ("width[%u] = %u", bit_counter, width);
+    //    DebugTrace ("width[%u] = %u", bit_counter, width);
     if (width >= DHT_START_BIT_WIDTH) {
       /* starting bit resetting the bit counter */
       bit_counter = 0;
