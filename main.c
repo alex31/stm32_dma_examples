@@ -66,7 +66,7 @@ typedef  uint16_t timer_reg_t;
 
 // 48 is bigger than needed 40, but burst mode implies size of buffer to be multiple of size of
 // burst data (4*2 = 8) 
-volatile timer_reg_t widths[256] __attribute__((aligned(16))); 
+timer_reg_t widths[256] __attribute__((aligned(16))); 
 
  
 static const DMAConfig dmaConfig = {
@@ -84,7 +84,7 @@ static const DMAConfig dmaConfig = {
   .circular = true,
   .end_cb = &end_cb,
   .error_cb = &error_cb,
-  .timeout = TIME_MS2I(200),
+  .timeout = TIME_MS2I(100),
   .pburst = 4,
   .mburst = 4,
   .fifo = 0
@@ -134,7 +134,7 @@ int main(void) {
   icuStart(&ICUD1, &icu1ch1_cfg);
   icuStartCapture(&ICUD1);
   // launch a DMA transfert in continuous mode
-  dmaStartTransfert(&dmap, &ICUD1.tim->CCR[1], (timer_reg_t *) widths, ARRAY_LEN(widths));
+  dmaStartTransfert(&dmap, &ICUD1.tim->CCR[1], widths, ARRAY_LEN(widths));
 
   chThdCreateStatic(waDht22Acquisition, sizeof(waDht22Acquisition), NORMALPRIO, dht22Acquisition, NULL);
   chThdCreateStatic(waDht22sendStartPulse, sizeof(waDht22sendStartPulse), NORMALPRIO, dht22sendStartPulse, NULL);
@@ -166,7 +166,7 @@ static noreturn void dht22sendStartPulse (void *arg)
   
   while (true) {
 
-    // do the interrogation pulse on the pin
+    // emit the interrogation pulse on the pin
     palSetLineMode(LINE_A08_ICU_IN, PAL_MODE_OUTPUT_OPENDRAIN);
     chThdSleepMicroseconds(MCU_REQUEST_WIDTH);
 
@@ -195,32 +195,25 @@ static noreturn void dht22Acquisition (void *arg)
   uint8_t bit_counter=0;
   while (true) {
     timer_reg_t width;
-    //    if (chMBFetchTimeout (&mb, (msg_t *) &width, TIME_MS2I(500)) != MSG_OK) {
-    //      DebugTrace ("***** TIMEOUT @ %u *******",  bit_counter);
     chMBFetchTimeout (&mb, (msg_t *) &width, TIME_INFINITE);
-      //    }
-    //    DebugTrace ("width[%u] = %u", bit_counter, width);
     if (width >= DHT_START_BIT_WIDTH) {
       /* starting bit resetting the bit counter */
       bit_counter = 0;
     } else  {
       fhtRegBB[bit_counter++] = width >= DHT_INTER_BIT_WIDTH;
     }
-    // if frame is completely acquired, exit loop 
+    // if frame is completely acquired, print decoded frame
     if (bit_counter == 40) {
-  
-      // decode binary stream and generate numeric field
-
       // DHT most significant bit is bit0, but MCU  most significant bit is bit7
       // revbit reverse the bits order in a byte/halfword,word
       for (uint i=0; i< sizeof(dhtData.raw); i++) {
 	dhtData.raw[i] = revbit(dhtData.raw[i]);
       }
-    
+      
       // compute and compare checksum
       if (dhtData.raw[4] == ((dhtData.raw[0] + dhtData.raw[1] +
 			      dhtData.raw[2] + dhtData.raw[3]) & 0xff)) {
-
+	
 	const float humidity = dhtData.humidity / 10.0f;
 	const float temp = (dhtData.temp & 0x7fff) / ((dhtData.temp & 0x8000) ? - 10.0f : 10.0f);
 	chprintf(chp, "Temperature: %.2f C, Humidity Rate: %.2f %% \n\r",
@@ -233,9 +226,6 @@ static noreturn void dht22Acquisition (void *arg)
   }
 }
 
-
-
-
 static void error_cb(DMADriver *_dmap, dmaerrormask_t err)
 {
   (void) _dmap;
@@ -247,7 +237,7 @@ static void end_cb(DMADriver *_dmap, void *buffer, const size_t n)
   (void) _dmap;
   
   chSysLockFromISR();
-  volatile timer_reg_t * const bArray = (volatile timer_reg_t *) buffer;
+  timer_reg_t * const bArray = (timer_reg_t *) buffer;
   for (size_t i=0; i<n; i++) {
     chMBPostI(&mb, (msg_t) bArray[i]);
   }
