@@ -16,8 +16,8 @@
 // Il n'y a que dans la partie Utilisation des 4 canaux
 // que le champ .channels de cette structure devra être modifié
 static PWMConfig pwmcfg = {	// pwm d'une frequence d'un hz et 10000 pas de quantification
-  .frequency = 10000,        // TickFreq : PwmFreq(100) * ticksPerPeriod(100)  
-  .period    = 100       , //   tickPerPeriod (100)
+  .frequency = 10000,        // TickFreq : PwmFreq(1) * ticksPerPeriod(10000)  
+  .period    = 10000       , //   tickPerPeriod (10000)
   .callback  = NULL,	     //   pas de callback de passage à l'etat actif
   .channels  = {
     // sortie active, polarité normale, pas de callback
@@ -63,14 +63,17 @@ static noreturn void pwmCommand(void *arg)
     // pour la led, on veut balayer toute la plage de 0 à tickPerPeriod
     // attention, pour le servomoteur ce ne sera plus le cas !
     pwmcnt_t newPeriod = potentiometerVal * pwmcfg.period;
+    if (newPeriod == 1)
+      newPeriod = 0;
+    else  if ((pwmcfg.period - newPeriod) == 1)
+      newPeriod = pwmcfg.period;
 
     //DebugTrace ("newPeriod = %lu", newPeriod);
     pwmEnableChannel(&PWMD2, 0, newPeriod); // entre 0 et tickPerPeriod
     
     // la frequence  maximum pour changer la valeur du pwm est la valeur du pwm :
     // si le pwm est à 50hz, on ne doit pas le changer plus de 50 fois par seconde
-    
-    chThdSleepMicroseconds ((1000000U * pwmcfg.period) / pwmcfg.frequency); 
+    chThdSleepMilliseconds ((1000U * pwmcfg.period) / pwmcfg.frequency); 
   }
   
 }

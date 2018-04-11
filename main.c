@@ -11,7 +11,7 @@
 #include "ttyConsole.h"
 #include "potentiometre.h"
 #include "pwm.h"
-#include "hal_dma.h"
+
 
 
 /*
@@ -26,49 +26,27 @@
  */
 
 
-#define ICU1_CH1_DMA_CONTROLER		2
-#define ICU1_CH1_DMA_STREAM		6
+#define ICU1_CH1_DMA_STREAM     STM32_DMA_STREAM(STM32_DMA_STREAM_ID(2, 6))
 #define ICU1_CH1_DMA_PRIORITY	6
 #define ICU1_CH1_DMA_CHANNEL	0
 #define ICU1_CHANNEL		ICU_CHANNEL_1
-#define DCR_DBL			(1 << 8) // 2 transfert
-// first register to get is CCR1
-#define DCR_DBA			(((uint32_t *) (&ICUD1.tim->CCR) - ((uint32_t *) ICUD1.tim))) 
 
-static void icu_lld_serve_rx_interrupt(void *icup, uint32_t flags);
+
+
+
+static bool dmaIsrHasFired = false;
+
 static bool dmaStart(void);
 static void dmaStop(void);
 static void dmaStartAcquisition(uint16_t *widthOrPeriod,
 				size_t depth);
 
-static volatile bool dmaIsrHasFired = false;
+static void icu_lld_serve_rx_interrupt(ICUDriver *icup, uint32_t flags);
 
-static const DMAConfig dmaConfig = {
-  .controller = ICU1_CH1_DMA_CONTROLER,
-  .stream = ICU1_CH1_DMA_STREAM,
-  .channel = ICU1_CH1_DMA_CHANNEL,
-  .priority = ICU1_CH1_DMA_PRIORITY,
-  .serve_dma_isr = &icu_lld_serve_rx_interrupt,
-  .serve_dma_isr_arg = &ICUD1,
-  //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
-  .periph_addr = &TIM1->DMAR,
-  .direction = STM32_DMA_CR_DIR_P2M,
-  .psize = 2,
-  .msize = 2,
-  .inc_peripheral_addr = false,
-  .inc_memory_addr = true,
-  .circular = true,
-  .isr_flags = STM32_DMA_CR_TCIE | STM32_DMA_CR_HTIE | STM32_DMA_CR_DMEIE | STM32_DMA_CR_TEIE,
-  .pburst = 4,
-  .mburst = 4,
-  .fifo = 2
-};
-
-static DMADriver dmad;
 
 static const ICUConfig icu1ch1_cfg = {
   .mode = ICU_INPUT_ACTIVE_HIGH,
-  .frequency = 1000000,                                    /* 1Mhz ICU clock frequency.   */
+  .frequency = 10000,                                    /* 10kHz ICU clock frequency.   */
   .width_cb = NULL,
   .period_cb = NULL,
   .overflow_cb = NULL,
@@ -82,7 +60,7 @@ static const ICUConfig icu1ch1_cfg = {
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 
-static uint16_t samples[128] __attribute__((aligned(4))) = {0}; // took 0.0128 seconds to fill
+static uint16_t samples[128] = {0};
 
 int main(void) {
 
@@ -101,13 +79,11 @@ int main(void) {
   consoleInit();
 
   initPotentiometre();
-
-  launchPwm(10000, 100);
+  launchPwm(100, 100);
   
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   dmaStart();
   icuStart(&ICUD1, &icu1ch1_cfg);
-  ICUD1.tim->DCR = DCR_DBL | DCR_DBA;
   dmaStartAcquisition(samples, ARRAY_LEN(samples));
   icuStartCapture(&ICUD1);
   //icuEnableNotifications(&ICUD1);
@@ -123,13 +99,10 @@ static noreturn void blinker (void *arg)
   (void)arg;
   chRegSetThreadName("blinker");
   while (true) {
-    for (size_t i=0; i< 2; i++) {
+    for (size_t i=0; i< 4; i++) {
       DebugTrace ("samples[%ul] = %u ISR has %s fired", i, samples[i], dmaIsrHasFired ? "" : "NOT");
     }
-    for (size_t i=ARRAY_LEN(samples)-2; i<ARRAY_LEN(samples) ; i++) {
-      DebugTrace ("samples[%ul] = %u", i, samples[i]);
-    }
-    dmaIsrHasFired = false;
+
     palToggleLine(LINE_C00_LED1); 	
     chThdSleepMilliseconds(500);
   }
@@ -139,24 +112,61 @@ static noreturn void blinker (void *arg)
 
 static bool dmaStart(void)
 {
- 
-  return dma_start(&dmad, &dmaConfig);
+  // state to be managed
+  bool b;
+
+  osalSysLock();
+  b = dmaStreamAllocate(ICU1_CH1_DMA_STREAM,
+			ICU1_CH1_DMA_PRIORITY,
+			(stm32_dmaisr_t)icu_lld_serve_rx_interrupt,
+			(void *) &ICUD1);
+  osalDbgAssert(!b, "stream already allocated");
+  dmaStreamSetPeripheral(ICU1_CH1_DMA_STREAM, &ICUD1.tim->CCR[ICU1_CHANNEL+1]);
+  osalSysUnlock();
+  
+  return b;
 }
 
 static void dmaStop(void)
 {
-   dma_stop(&dmad);
+  osalSysLock();
+  dmaStreamRelease(ICU1_CH1_DMA_STREAM);
+  osalSysUnlock();
 }
 
 static void dmaStartAcquisition(uint16_t *widthsAndPeriods,
 				const size_t depth)
 {
-  dma_start_ptransfert(&dmad, widthsAndPeriods, depth);
+  (void) widthsAndPeriods;
+  (void) depth;
+  const stm32_dma_stream_t  *dmastream = ICU1_CH1_DMA_STREAM;
+
+  uint32_t dmamode = STM32_DMA_CR_CHSEL(ICU1_CH1_DMA_CHANNEL) |
+    STM32_DMA_CR_PL(ICU1_CH1_DMA_PRIORITY) |              // ** Half transfert ISR (HTIE) missing ?
+    STM32_DMA_CR_DIR_P2M | // Peripheral to memory
+    STM32_DMA_CR_MSIZE_HWORD | STM32_DMA_CR_PSIZE_HWORD | // 16 bits to 16 bits transfert
+    STM32_DMA_CR_MINC        | STM32_DMA_CR_TCIE        | // memory increment, transfert complete ISR enable
+    STM32_DMA_CR_DMEIE       | STM32_DMA_CR_TEIE; // direct mode error and transfert error ISR enable
+
+  if (depth > 1) {
+    dmamode |= (STM32_DMA_CR_CIRC | STM32_DMA_CR_HTIE);
+  }
+  
+  dmaStreamSetMemory0(dmastream, widthsAndPeriods);
+  dmaStreamSetTransactionSize(dmastream, depth);
+  dmaStreamSetMode(dmastream, dmamode);
+  dmaStreamEnable(dmastream);
+
+
+  osalSysLock();
+  
+
+  osalSysUnlock();
 }
 
 
 
-static void icu_lld_serve_rx_interrupt(void *icup, uint32_t flags)
+static void icu_lld_serve_rx_interrupt(ICUDriver *icup, uint32_t flags)
 {
   (void) icup;
   dmaIsrHasFired = true;
