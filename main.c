@@ -11,6 +11,7 @@
 #include "ttyConsole.h"
 #include "hal_stm32_dma.h"
 #include "bitband.h"
+#include "math.h"
 
 
 /*
@@ -80,6 +81,7 @@ static PWMConfig pwmcfg = {     // pwm d'une frequence d'un hz et 10000 pas de q
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 
+const float pi=3.15169f;
 
 int main(void) {
 
@@ -98,7 +100,8 @@ int main(void) {
 
 
   for (size_t i=0; i< WIDTHS_SIZE; i++) {
-    widths[i] = i*(1.0f*TICKS_PER_PERIOD/WIDTHS_SIZE);
+    const float angle = i*pi/WIDTHS_SIZE;
+    widths[i] = TICKS_PER_PERIOD * powf(sinf(angle), 10.0f);
   }
   
   consoleInit();
