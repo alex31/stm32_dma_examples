@@ -84,7 +84,7 @@ static const DMAConfig dmaConfig = {
   .circular = true,
   .end_cb = &end_cb,
   .error_cb = &error_cb,
-  .timeout = TIME_MS2I(100),
+  .timeout = TIME_MS2I(1),
   .pburst = 4,
   .mburst = 4,
   .fifo = 0
@@ -174,7 +174,7 @@ static noreturn void dht22sendStartPulse (void *arg)
     palSetLineMode(LINE_A08_ICU_IN, PAL_MODE_ALTERNATE(AF_LINE_A08_ICU_IN)
 		   | PAL_STM32_PUPDR_PULLUP);
 
-    chThdSleepMilliseconds(1000);
+    chThdSleepMilliseconds(500);
   }
 }
 
