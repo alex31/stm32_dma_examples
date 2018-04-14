@@ -113,7 +113,7 @@
  * @brief   Enables the ICU subsystem.
  */
 #if !defined(HAL_USE_ICU) || defined(__DOXYGEN__)
-#define HAL_USE_ICU                 TRUE
+#define HAL_USE_ICU                 FALSE
 #endif
 
 /**
@@ -134,7 +134,7 @@
  * @brief   Enables the PWM subsystem.
  */
 #if !defined(HAL_USE_PWM) || defined(__DOXYGEN__)
-#define HAL_USE_PWM                 FALSE
+#define HAL_USE_PWM                 TRUE
 #endif
 
 /**

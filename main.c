@@ -15,92 +15,71 @@
 
 /*
 
-  ° alimenter DHT22
-  ° connecter DATA DHT22 sur A08 
+  ° connecter A08 sur analyseur logique
   ° connecter B06 (uart1_tx) sur ftdi rx
   ° connecter B07 (uart1_rx) sur ftdi tx
   ° connecter C00 sur led1 
 
- */
+*/
 
-/*===========================================================================*/
-/* DHT11 related defines                                                     */
-/*===========================================================================*/
-/*
- * Width are in useconds
- */
-#define    MCU_REQUEST_WIDTH                     18000
-#define    DHT_ERROR_WIDTH                         200
-#define    DHT_START_BIT_WIDTH                      80
-#define    DHT_INTER_BIT_WIDTH                      50
+#define WIDTHS_SIZE	 1024
+#define PWM_FREQ         500
+#define TICKS_PER_PERIOD 22400 // we can also use 1e4 notation
 
-/*===========================================================================*/
-/* ICU related code                                                          */
-/*===========================================================================*/
+#define TICK_FREQ (PWM_FREQ * TICKS_PER_PERIOD)
 
-#define    ICU_TIM_FREQ         1e6 // 1Mhz
-#define    ICU1_CHANNEL		ICU_CHANNEL_1
-
-static void error_cb(DMADriver *dmap, dmaerrormask_t err);
-static volatile dmaerrormask_t last_err = 0;
-
-typedef union {
-  struct {
-    uint16_t humidity;
-    uint16_t temp;
-    uint8_t  chksum; 
-  } __attribute__ ((scalar_storage_order ("big-endian"))) ; // DHT halfword are big_endian
-							    // but MCU is little_endian
-    uint8_t raw [5];
-}   DhtData;
-
-// icucnt_t is 32 bits wide for 32bits timer, but we use TIM1 which is 16 bits timer
-// let's optimize
-typedef  uint16_t timer_reg_t;
-
-// 48 is bigger than needed 40, but burst mode implies size of buffer to be multiple of size of
-// burst data (4*2 = 8) 
-timer_reg_t widths[48] __attribute__((aligned(4))); 
+typedef uint16_t timer_reg_t;
+timer_reg_t widths[WIDTHS_SIZE] __attribute__((aligned(16))); 
 
  
 static const DMAConfig dmaConfig = {
-  .stream = STM32_ICU1_CH1_DMA_STREAM,
-  .channel = STM32_ICU1_CH1_DMA_CHANNEL,
-  .dma_priority = STM32_ICU1_CH1_DMA_PRIORITY,
-  .irq_priority = STM32_ICU1_CH1_DMA_IRQ_PRIORITY,
-  //.periph_addr = &ICUD1.tim->DMAR, : not a constant, should have to use cmsis definition
-  //  .periph_addr = &TIM1->DMAR,
-  .direction = DMA_DIR_P2M,
+  .stream = STM32_PWM1_CH1_DMA_STREAM,
+  .channel = STM32_PWM1_CH1_DMA_CHANNEL,
+  .dma_priority = STM32_PWM1_CH1_DMA_PRIORITY,
+  .irq_priority = STM32_PWM1_CH1_DMA_IRQ_PRIORITY,
+  .direction = DMA_DIR_M2P,
   .psize = sizeof(timer_reg_t), // if we change for a 32 bit timer just have to change
   .msize = sizeof(timer_reg_t), // type of width array
   .inc_peripheral_addr = false,
   .inc_memory_addr = true,
-  .circular = false,
-  .error_cb = &error_cb,
+  .circular = true,
+  .error_cb = NULL,
   .end_cb = NULL,
   .pburst = 0,
-  .mburst = 4,
-  .fifo = 4
+  .mburst = 0,
+  .fifo = 0
 };
 
 static DMADriver dmap;
 
-static const ICUConfig icu1ch1_cfg = {
-  .mode = ICU_INPUT_ACTIVE_HIGH,
-  .frequency = ICU_TIM_FREQ,
-  .width_cb = NULL,
-  .period_cb = NULL,
-  .overflow_cb = NULL,
-  .channel = ICU1_CHANNEL,
-  .dier = TIM_DIER_CC1DE | TIM_DIER_TDE
+
+// pour les parties 1 (persistance) et 2 (servo) et 3 (il variation continue du pwm)
+// n'y a pas besoin de modifier  la structure de configuration.
+// Il n'y a que dans la partie Utilisation des 4 canaux
+// que le champ .channels de cette structure devra être modifié
+static PWMConfig pwmcfg = {     // pwm d'une frequence d'un hz et 10000 pas de quantification
+  .frequency = TICK_FREQ,        // TickFreq : PwmFreq(1) * ticksPerPeriod(10000)  
+  .period    = TICKS_PER_PERIOD, //   tickPerPeriod (10000)
+  .callback  = NULL,             //   pas de callback de passage à l'etat actif
+  .channels  = {
+    // sortie active, polarité normale, pas de callback
+    {.mode = PWM_OUTPUT_ACTIVE_HIGH, .callback = NULL},
+    // sortie inactive
+    {.mode = PWM_OUTPUT_DISABLED, .callback = NULL},
+    // sortie inactive
+    {.mode = PWM_OUTPUT_DISABLED, .callback = NULL},
+    // sortie inactive
+    {.mode = PWM_OUTPUT_DISABLED, .callback = NULL}
+  },
+  .cr2  =  STM32_TIM_CR2_CCDS, 
+  .dier =  STM32_TIM_DIER_CC1DE
 };
+
 
 
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 
-static THD_WORKING_AREA(waDht22Acquisition, 512);
-static noreturn void dht22Acquisition (void *arg);
 
 int main(void) {
 
@@ -116,14 +95,20 @@ int main(void) {
   chSysInit();
   initHeap();
   dmaObjectInit(&dmap);
+
+
+  for (size_t i=0; i< WIDTHS_SIZE; i++) {
+    widths[i] = i*(1.0f*TICKS_PER_PERIOD/WIDTHS_SIZE);
+  }
   
   consoleInit();
 
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   dmaStart(&dmap, &dmaConfig);
-  icuStart(&ICUD1, &icu1ch1_cfg);
-  icuStartCapture(&ICUD1);
-  chThdCreateStatic(waDht22Acquisition, sizeof(waDht22Acquisition), NORMALPRIO, dht22Acquisition, NULL);
+  pwmStart(&PWMD1, &pwmcfg);
+  pwmEnableChannel(&PWMD1, 0, 1); 
+  dmaStartTransfert(&dmap, &TIM1->CCR1, widths, WIDTHS_SIZE);
+
   
   consoleLaunch();  
   chThdSleep(TIME_INFINITE); 
@@ -139,91 +124,5 @@ static noreturn void blinker (void *arg)
     palToggleLine(LINE_C00_LED1); 	
     chThdSleepMilliseconds(500);
   }
-}
-
-static noreturn void dht22Acquisition (void *arg)
-{
-  (void)arg;
-  chRegSetThreadName("dht22Acquisition");
-
-  static DhtData dhtData;
-
-  // use bitbanding capability of STM32F4 (see ref manuel RM090)
-  volatile uint32_t * const fhtRegBB = bb_sramp(&dhtData, 0);
-
-  // when the pin is in gpio mode, should be forced LOW
-  palClearLine(LINE_A08_ICU_IN);
-  
-  while (true) {
-
-    // do the interrogation pulse on the pin
-    palSetLineMode(LINE_A08_ICU_IN, PAL_MODE_OUTPUT_OPENDRAIN);
-    chThdSleepMicroseconds(MCU_REQUEST_WIDTH);
-
-    // revert pin to input capture mode
-    palSetLineMode(LINE_A08_ICU_IN, PAL_MODE_ALTERNATE(AF_LINE_A08_ICU_IN)
-		   | PAL_STM32_PUPDR_PULLUP);
-
-    // launch a DMA transfert from timer in input capure mode and memory
-    // we don't verify return value, because depending on how bit N°1 is found
-    // it's normal not to get 44 values and falling in TIME_OUT
-    dmaTransfertTimeout(&dmap, &ICUD1.tim->CCR[1], widths, ARRAY_LEN(widths),
-			TIME_MS2I(20));
-
-   if (last_err != MSG_OK) {
-      DebugTrace ("DMA Error");
-      last_err = 0;
-    }
-     
-    
-    // generate binary stream using pulse width registered by ICU+DMA
-    uint8_t bit_counter=0;
-
-    for (size_t i=0; i<ARRAY_LEN(widths); i++) {
-      const timer_reg_t width = widths[i];
-      //DebugTrace ("width[%u] = %lu bc=%u", i, width, bit_counter);
-      if (width >= DHT_START_BIT_WIDTH) {
-	/* starting bit resetting the bit counter */
-	bit_counter = 0;
-      } else  {
-	fhtRegBB[bit_counter++] = width >= DHT_INTER_BIT_WIDTH;
-      }
-      // if frame is completely acquired, exit loop 
-      if (bit_counter == 40)
-	break;
-    }
-  
-  
-    // decode binary stream and generate numeric field
-
-    // DHT most significant bit is bit0, but MCU  most significant bit is bit7
-    // revbit reverse the bits order in a byte/halfword,word
-    for (uint i=0; i< sizeof(dhtData.raw); i++) {
-      dhtData.raw[i] = revbit(dhtData.raw[i]);
-    }
-    
-    // compute and compare checksum
-    if (dhtData.raw[4] == ((dhtData.raw[0] + dhtData.raw[1] +
-			    dhtData.raw[2] + dhtData.raw[3]) & 0xff)) {
-
-      const float humidity = dhtData.humidity / 10.0f;
-      const float temp = (dhtData.temp & 0x7fff) / ((dhtData.temp & 0x8000) ? - 10.0f : 10.0f);
-      chprintf(chp, "Temperature: %.2f C, Humidity Rate: %.2f %% \n\r",
-	       temp, humidity);
-    } else {
-      chprintf(chp, "Checksum FAILED!\n\r");
-    }
-    
-    chThdSleepMilliseconds(1000);
-  }
-}
-
-
-
-
-static void error_cb(DMADriver *_dmap, dmaerrormask_t err)
-{
-  (void) _dmap;
-  last_err |= err;
 }
 
