@@ -33,10 +33,10 @@ timer_reg_t widths[WIDTHS_SIZE] __attribute__((aligned(16)));
 
  
 static const DMAConfig dmaConfig = {
-  .stream = STM32_PWM1_CH1_DMA_STREAM,
-  .channel = STM32_PWM1_CH1_DMA_CHANNEL,
-  .dma_priority = STM32_PWM1_CH1_DMA_PRIORITY,
-  .irq_priority = STM32_PWM1_CH1_DMA_IRQ_PRIORITY,
+  .stream = STM32_PWM1_UP_DMA_STREAM,
+  .channel = STM32_PWM1_UP_DMA_CHANNEL,
+  .dma_priority = STM32_PWM1_UP_DMA_PRIORITY,
+  .irq_priority = STM32_PWM1_UP_DMA_IRQ_PRIORITY,
   .direction = DMA_DIR_M2P,
   .psize = sizeof(timer_reg_t), // if we change for a 32 bit timer just have to change
   .msize = sizeof(timer_reg_t), // type of width array
@@ -72,7 +72,7 @@ static PWMConfig pwmcfg = {     // pwm d'une frequence d'un hz et 10000 pas de q
     {.mode = PWM_OUTPUT_DISABLED, .callback = NULL}
   },
   .cr2  =  STM32_TIM_CR2_CCDS, 
-  .dier =  STM32_TIM_DIER_CC1DE
+  .dier =  STM32_TIM_DIER_UDE
 };
 
 
