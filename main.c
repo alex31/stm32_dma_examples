@@ -23,7 +23,7 @@
 
 */
 
-#define WIDTHS_SIZE	 1024
+#define WIDTHS_SIZE	 512
 #define CHANNELS	 4
 #define PWM_FREQ         500
 #define TICKS_PER_PERIOD 22400 // we can also use 1e4 notation
