@@ -24,13 +24,17 @@
 */
 
 #define WIDTHS_SIZE	 1024
+#define CHANNELS	 4
 #define PWM_FREQ         500
 #define TICKS_PER_PERIOD 22400 // we can also use 1e4 notation
 
 #define TICK_FREQ (PWM_FREQ * TICKS_PER_PERIOD)
+#define    DCR_DBL              ((4-1) << 8) // 2 transfert
+// first register to get is CCR1
+#define DCR_DBA                 (((uint32_t *) (&PWMD1.tim->CCR) - ((uint32_t *) PWMD1.tim))) 
 
 typedef uint16_t timer_reg_t;
-timer_reg_t widths[WIDTHS_SIZE] __attribute__((aligned(16))); 
+timer_reg_t widths[WIDTHS_SIZE][CHANNELS] __attribute__((aligned(16))); 
 
  
 static const DMAConfig dmaConfig = {
@@ -63,14 +67,10 @@ static PWMConfig pwmcfg = {     // pwm d'une frequence d'un hz et 10000 pas de q
   .period    = TICKS_PER_PERIOD, //   tickPerPeriod (10000)
   .callback  = NULL,             //   pas de callback de passage à l'etat actif
   .channels  = {
-    // sortie active, polarité normale, pas de callback
     {.mode = PWM_OUTPUT_ACTIVE_HIGH, .callback = NULL},
-    // sortie inactive
-    {.mode = PWM_OUTPUT_DISABLED, .callback = NULL},
-    // sortie inactive
-    {.mode = PWM_OUTPUT_DISABLED, .callback = NULL},
-    // sortie inactive
-    {.mode = PWM_OUTPUT_DISABLED, .callback = NULL}
+    {.mode = PWM_OUTPUT_ACTIVE_HIGH, .callback = NULL},
+    {.mode = PWM_OUTPUT_ACTIVE_HIGH, .callback = NULL},
+    {.mode = PWM_OUTPUT_ACTIVE_HIGH, .callback = NULL},
   },
   .cr2  =  STM32_TIM_CR2_CCDS, 
   .dier =  STM32_TIM_DIER_UDE
@@ -101,7 +101,9 @@ int main(void) {
 
   for (size_t i=0; i< WIDTHS_SIZE; i++) {
     const float angle = i*pi/WIDTHS_SIZE;
-    widths[i] = TICKS_PER_PERIOD * powf(sinf(angle), 10.0f);
+    for(size_t j=0;j<4;j++) {
+      widths[i][j] = TICKS_PER_PERIOD * powf(sinf(angle+(j*pi/4)), 10.0f);
+    }
   }
   
   consoleInit();
@@ -109,8 +111,12 @@ int main(void) {
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   dmaStart(&dmap, &dmaConfig);
   pwmStart(&PWMD1, &pwmcfg);
-  pwmEnableChannel(&PWMD1, 0, 1); 
-  dmaStartTransfert(&dmap, &TIM1->CCR1, widths, WIDTHS_SIZE);
+  PWMD1.tim->DCR = DCR_DBL | DCR_DBA;
+
+  for (size_t j=0;j<4;j++)
+    pwmEnableChannel(&PWMD1, j, 1);
+  
+  dmaStartTransfert(&dmap, &TIM1->DMAR, widths, WIDTHS_SIZE*CHANNELS);
 
   
   consoleLaunch();  
