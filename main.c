@@ -16,7 +16,7 @@
 
 /*
 
-  ° connecter A08 sur analyseur logique
+  ° connecter A08, A09, A10, A11 sur des leds
   ° connecter B06 (uart1_tx) sur ftdi rx
   ° connecter B07 (uart1_rx) sur ftdi tx
   ° connecter C00 sur led1 
