@@ -32,7 +32,7 @@
 #                | (__  | (_) | | | | | | |   | |    __/ |        
 #                 \___|  \___/  |_| |_| |_|   |_|   |___/         
 */
-#define DSHOT_SPEED_KHZ			606
+#define DSHOT_SPEED_KHZ			600
 #define DSHOT_FRAME_SILENT_SYNC_BITS	4
 #define CHANNELS			4
 
@@ -57,9 +57,9 @@
 #define DSHOT_SPEED (DSHOT_SPEED_KHZ*1000)
 #define TICK_FREQ (PWM_FREQ * TICKS_PER_PERIOD)
 #define DSHOT_PWM_PERIOD (TICK_FREQ/DSHOT_SPEED)
-#define DSHOT_BIT0_DUTY (DSHOT_PWM_PERIOD * 323 / 1000)
-#define DSHOT_BIT1_DUTY (DSHOT_PWM_PERIOD * 684 / 1000)
-//#define DSHOT_BIT1_DUTY (DSHOT_BIT0_DUTY*2)
+#define DSHOT_BIT0_DUTY (DSHOT_PWM_PERIOD * 373 / 1000)
+//#define DSHOT_BIT1_DUTY (DSHOT_PWM_PERIOD * 684 / 1000)
+#define DSHOT_BIT1_DUTY (DSHOT_BIT0_DUTY*2)
 #define    DCR_DBL              ((4-1) << 8) // 2 transfert
 // first register to get is CCR1
 #define DCR_DBA                 (((uint32_t *) (&PWMD1.tim->CCR) - ((uint32_t *) PWMD1.tim))) 
