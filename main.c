@@ -275,10 +275,10 @@ static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void *
     const TelemetryDownMsg *msg = (TelemetryDownMsg *) buffer;
     switch (msg->msgId) {
     case PWM_ORDER : {
-      const uint32_t rawThrottle = ((2*msg->duty)-2000);
+      const uint32_t rawThrottle = msg->duty;
       int throttle=0;
       if (rawThrottle) 
-	throttle = rawThrottle < 2000 ? rawThrottle+48 : 2047;
+	throttle = rawThrottle < 2047 ? rawThrottle : 2047;
       
       dshotMotors.dp[msg->escIdx] = makeDshotPacket(throttle, 0);
       buildDshotDmaBuffer(&dshotMotors, &dsdb);
