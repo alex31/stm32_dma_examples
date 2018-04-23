@@ -8,13 +8,7 @@
  * USB Driver structure.
  */
 
-#if HAL_USE_SERIAL_USB
-SerialUSBDriver SDU1;
-BaseSequentialStream *chp = (BaseSequentialStream *) &SDU1;
-#else
-BaseSequentialStream *chp = (BaseSequentialStream *) &SD1;
-#endif // HAL_USE_SERIAL_USB
-
+BaseSequentialStream *chp = (BaseSequentialStream *) &SD3;
 
 
 const uint8_t *UniqProcessorId = (uint8_t *) 0x1FFF7A10;

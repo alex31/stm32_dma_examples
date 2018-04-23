@@ -37,7 +37,7 @@
  * @brief   Enables the DMA subsystem.
  */
 #if !defined(STM32_DMA_USE_WAIT) || defined(__DOXYGEN__)
-#define   STM32_DMA_USE_WAIT       TRUE
+#define   STM32_DMA_USE_WAIT       FALSE
 #endif
 
 #if !defined(STM32_DMA_USE_MUTUAL_EXCLUSION) || defined(__DOXYGEN__)
