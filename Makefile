@@ -146,6 +146,7 @@ CSRC = $(STARTUPSRC) \
        $(VARIOUS)/microrl/microrl.c \
        $(VARIOUS)/rtcAccess.c \
        $(VARIOUS)/hal_stm32_dma.c \
+       $(VARIOUS)/simpleSerialMessage.c \
        ttyConsole.c \
        globalVar.c \
        main.c
@@ -227,8 +228,8 @@ CPPWARN = -Wall -Wextra -Wundef
 # Start of user section
 #
 
-# List all user C define here, like -D_DEBUG=1
-UDEFS = -DTRACE
+# List all user C define here, like -D_DEBUG=1 -DTRACE
+UDEFS = 
 
 # Define ASM defines here
 UADEFS =
