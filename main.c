@@ -34,10 +34,11 @@
 */
 #define DSHOT_SPEED_KHZ			600
 #define DSHOT_FRAME_SILENT_SYNC_BITS	4
-#define CHANNELS			4
+#define DSHOT_CHANNELS			4
+#define DSHOT_TELEMETRY_BAUD		115200
 
+#define BENCH_TELEMETRY_BAUD	        115200
 
-#define BENCH_TELEMETRY_BAUD			115200
 
 /*
 #                     _            __   _            _    _      _                          
@@ -77,11 +78,11 @@ typedef union {
 }  DshotPacket;
 
 typedef struct {
-  DshotPacket dp[CHANNELS];
+  DshotPacket dp[DSHOT_CHANNELS];
 } DshotPackets;
 
 typedef struct {
-  timer_reg_t widths[DSHOT_DMA_BUFFER_SIZE][CHANNELS] __attribute__((aligned(16)));
+  timer_reg_t widths[DSHOT_DMA_BUFFER_SIZE][DSHOT_CHANNELS] __attribute__((aligned(16)));
 } DshotDmaBuffer;
 
 typedef enum  {PWM_ORDER=0, CALIBRATE} IncomingMessageId;
@@ -143,7 +144,7 @@ static const DMAConfig dmaConfig = {
   .error_cb = NULL,
   .end_cb = NULL,
   .pburst = 0,
-  .mburst = 0,
+  .mburst = 4,
   .fifo = 0
 };
 
@@ -209,7 +210,7 @@ int main(void) {
   
   while (true) {
     if (dmap.state == DMA_READY) {
-      dmaStartTransfert(&dmap, &TIM1->DMAR, &dsdb, DSHOT_DMA_BUFFER_SIZE * CHANNELS);
+      dmaStartTransfert(&dmap, &TIM1->DMAR, &dsdb, DSHOT_DMA_BUFFER_SIZE * DSHOT_CHANNELS);
     } else {
       DebugTrace ("DMA Not Ready");
     }
@@ -237,7 +238,7 @@ DshotPacket makeDshotPacket(const uint16_t throttle, bool tlmRequest)
 
 void buildDshotDmaBuffer(const DshotPackets * const dsp,  DshotDmaBuffer * const dma)
 {
-  for (size_t chanIdx=0; chanIdx < CHANNELS; chanIdx++) {
+  for (size_t chanIdx=0; chanIdx < DSHOT_CHANNELS; chanIdx++) {
     for (size_t bitIdx=0; bitIdx < DSHOT_BIT_WIDTHS; bitIdx++) {
       dma->widths[bitIdx][chanIdx] = dsp->dp[chanIdx].rawFrame &
 	(1 << ((DSHOT_BIT_WIDTHS -1) - bitIdx)) ?
