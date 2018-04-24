@@ -6,6 +6,7 @@
 #include <hal.h>
 #include <stdnoreturn.h>
 #include <math.h>
+#include <string.h>
 #include "globalVar.h"
 #include "stdutil.h"
 #include "ttyConsole.h"
@@ -268,10 +269,11 @@ int main(void) {
       }
       buildDshotDmaBuffer(&dshotMotors, &dsdb);
       dmaStartTransfert(&dmap, &TIM1->DMAR, &dsdb, DSHOT_DMA_BUFFER_SIZE * DSHOT_CHANNELS);
+      //      DebugTrace("T=%u", throttle);
     } else {
       DebugTrace ("DMA Not Ready");
     }
-    chThdSleepMicroseconds(500); // 1khz
+    chThdSleepMicroseconds(1000); // 1khz
   }
 }
 
@@ -411,6 +413,7 @@ static noreturn void dshotTlmRec (void *arg)
        DebugTrace ("Dshot Telemetry error");
        // empty buffer to resync
        while (sdGetTimeout(&SD2, TIME_IMMEDIATE) >= 0) {};
+       bzero(dshotMotors.dt[idx].rawData, sizeof(DshotTelemetry));
      } else {
        /* DebugTrace("[%lu] temp=%u volt=%.2f current=%.2f consum=%u mA rpm=%u", */
        /* 		  idx, */
@@ -433,18 +436,19 @@ static void sendTelemetryThd (void *arg)
 
   while (true) {
     for (int idx=0; idx<2; idx++) {
-      const CommandUpMsg upMsg = (CommandUpMsg) {.msgId = 0,
-			    .voltage = dshotMotors.dt[idx].voltage/100.0,
-			    .current = dshotMotors.dt[idx].current/100.0,
-			    .consumption = dshotMotors.dt[idx].consumption,
-			    .rpm = dshotMotors.dt[idx].rpm*100,
-			    .temperature = dshotMotors.dt[idx].temp,
-			    .escIdx = idx
-      };
-      simpleMsgSend((BaseSequentialStream *) &SD1, (uint8_t *) &upMsg, sizeof(upMsg)); 
+      if (dshotMotors.dt[idx].temp != 0) {
+	const CommandUpMsg upMsg = (CommandUpMsg) {.msgId = 0,
+						   .voltage = dshotMotors.dt[idx].voltage/100.0,
+						   .current = dshotMotors.dt[idx].current/100.0,
+						   .consumption = dshotMotors.dt[idx].consumption,
+						   .rpm = dshotMotors.dt[idx].rpm*100,
+						   .temperature = dshotMotors.dt[idx].temp,
+						   .escIdx = idx
+	};
+	simpleMsgSend((BaseSequentialStream *) &SD1, (uint8_t *) &upMsg, sizeof(upMsg));
+      }
+      chThdSleepMilliseconds(100);
     }
-    
-    chThdSleepMilliseconds(100);
   }
 }
 
