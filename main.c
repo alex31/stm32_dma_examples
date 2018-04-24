@@ -93,22 +93,34 @@ typedef struct {
 }  __attribute__ ((__packed__)) DshotTelemetry ;
 
 typedef struct {
-  DshotPacket dp[DSHOT_CHANNELS];
-  DshotTelemetry dt[DSHOT_CHANNELS];
+  DshotPacket       dp[DSHOT_CHANNELS];
+  DshotTelemetry    dt[DSHOT_CHANNELS];
   volatile uint8_t  currentTlmQry;
   volatile bool	    onGoingQry;
 } DshotPackets;
 
 typedef struct {
+  // alignment to satisfy dma requirement
   timer_reg_t widths[DSHOT_DMA_BUFFER_SIZE][DSHOT_CHANNELS] __attribute__((aligned(16)));
 } DshotDmaBuffer;
 
 typedef enum  {PWM_ORDER=0, CALIBRATE} IncomingMessageId;
+
 typedef struct {
   uint16_t msgId;
   int16_t  escIdx;
   int16_t  duty;
 } TelemetryDownMsg;
+
+typedef struct {
+  uint32_t msgId;
+  float	   voltage;
+  float	   current;
+  float	   consumption;
+  float	   rpm;
+  float	   temperature;
+  uint32_t escIdx;
+} CommandUpMsg;
 
 
 
@@ -126,7 +138,7 @@ typedef struct {
 DshotPacket makeDshotPacket(const uint16_t throttle, bool tlmRequest);
 void        buildDshotDmaBuffer(const DshotPackets * const dsp,  DshotDmaBuffer * const dma);
 static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void * const userData);
-//static noreturn void sendTelemetryThd (void *arg);
+static noreturn void sendTelemetryThd (void *arg);
 static noreturn void blinker (void *arg);
 static noreturn void dshotTlmRec (void *arg);
 static uint8_t updateCrc8(uint8_t crc, uint8_t crc_seed);
@@ -143,7 +155,7 @@ uint8_t calculateCrc8(const uint8_t *Buf, const uint8_t BufLen);
 static msg_t  _mbBuf[1];
 static MAILBOX_DECL(mb, _mbBuf, sizeof(_mbBuf)/sizeof(_mbBuf[0])); 
 
-//static THD_WORKING_AREA(waSendTelemetry, 1024);
+static THD_WORKING_AREA(waSendTelemetry, 1024);
 static THD_WORKING_AREA(waBlinker, 512);
 static THD_WORKING_AREA(waDshotTlmRec, 512);
 static volatile int throttle=0;
@@ -225,6 +237,8 @@ int main(void) {
 
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   chThdCreateStatic(waDshotTlmRec, sizeof(waDshotTlmRec), NORMALPRIO, dshotTlmRec, NULL);
+  chThdCreateStatic(waSendTelemetry, sizeof(waSendTelemetry), NORMALPRIO, &sendTelemetryThd, NULL);
+  
   dmaStart(&dmap, &dmaConfig);
   pwmStart(&PWMD1, &pwmcfg);
   PWMD1.tim->DCR = DCR_DBL | DCR_DBA; // enable bloc register DMA transaction
@@ -245,7 +259,7 @@ int main(void) {
   int count = 0;
   while (true) {
     if (dmap.state == DMA_READY) {
-      if (count++ >= 1000) {
+      if (count++ >= 100) {
 	dshotMotors.dp[0] = makeDshotPacket(throttle, 1);
 	chMBPostTimeout(&mb, 0, TIME_IMMEDIATE);
 	count = 0;
@@ -295,6 +309,27 @@ void buildDshotDmaBuffer(const DshotPackets * const dsp,  DshotDmaBuffer * const
   }
 }
 
+static uint8_t updateCrc8(uint8_t crc, uint8_t crc_seed)
+{
+    uint8_t crc_u = crc;
+    crc_u ^= crc_seed;
+
+    for (int i=0; i<8; i++) {
+        crc_u = ( crc_u & 0x80 ) ? 0x7 ^ ( crc_u << 1 ) : ( crc_u << 1 );
+    }
+
+    return (crc_u);
+}
+
+uint8_t calculateCrc8(const uint8_t *Buf, const uint8_t BufLen)
+{
+    uint8_t crc = 0;
+    for (int i = 0; i < BufLen; i++) {
+        crc = updateCrc8(Buf[i], crc);
+    }
+
+    return crc;
+}
 
 
 /*
@@ -317,6 +352,8 @@ static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void *
     DebugTrace ("Msg len error : rec %u instead of waited %u", len, sizeof(TelemetryDownMsg));
   } else {
     const TelemetryDownMsg *msg = (TelemetryDownMsg *) buffer;
+    if (msg->escIdx != 0)
+      return;
     switch (msg->msgId) {
     case PWM_ORDER : {
       const uint32_t rawThrottle = msg->duty;
@@ -366,7 +403,7 @@ static noreturn void dshotTlmRec (void *arg)
     chMBFetchTimeout(&mb, (msg_t *) &escIdx, TIME_INFINITE);
     const uint32_t idx = escIdx;
     dshotMotors.onGoingQry = true;
-    sdRead(&SD2, (uint8_t *) &(dshotMotors.dt[idx]), sizeof(DshotTelemetry));
+    sdRead(&SD2, dshotMotors.dt[idx].rawData, sizeof(DshotTelemetry));
     dshotMotors.onGoingQry = false;
 
      if (calculateCrc8(dshotMotors.dt[idx].rawData, 
@@ -375,37 +412,40 @@ static noreturn void dshotTlmRec (void *arg)
        // empty buffer to resync
        while (sdGetTimeout(&SD2, TIME_IMMEDIATE) >= 0) {};
      } else {
-       DebugTrace("[%lu] temp=%u volt=%.2f current=%.2f consum=%u mA rpm=%u",
-		  idx,
-		  dshotMotors.dt[idx].temp,
-		  dshotMotors.dt[idx].voltage/100.0,
-		  dshotMotors.dt[idx].current/100.0,
-		  dshotMotors.dt[idx].consumption,
-		  dshotMotors.dt[idx].rpm*100);
+       /* DebugTrace("[%lu] temp=%u volt=%.2f current=%.2f consum=%u mA rpm=%u", */
+       /* 		  idx, */
+       /* 		  dshotMotors.dt[idx].temp, */
+       /* 		  dshotMotors.dt[idx].voltage/100.0, */
+       /* 		  dshotMotors.dt[idx].current/100.0, */
+       /* 		  dshotMotors.dt[idx].consumption, */
+       /* 		  dshotMotors.dt[idx].rpm*100); */
      }
   }
 }
 
+ /* my ($msgId, $bat_voltage, $current, $consumption,		    */
+ /* 	$rpm, $temperature, $channel) = unpack ('Lf5L', $$bufferRef); */
 
-
-static uint8_t updateCrc8(uint8_t crc, uint8_t crc_seed)
+static void sendTelemetryThd (void *arg)
 {
-    uint8_t crc_u = crc;
-    crc_u ^= crc_seed;
+  (void)arg;
+  chRegSetThreadName("telemetry");
 
-    for (int i=0; i<8; i++) {
-        crc_u = ( crc_u & 0x80 ) ? 0x7 ^ ( crc_u << 1 ) : ( crc_u << 1 );
+  while (true) {
+    for (int idx=0; idx<2; idx++) {
+      const CommandUpMsg upMsg = (CommandUpMsg) {.msgId = 0,
+			    .voltage = dshotMotors.dt[idx].voltage/100.0,
+			    .current = dshotMotors.dt[idx].current/100.0,
+			    .consumption = dshotMotors.dt[idx].consumption,
+			    .rpm = dshotMotors.dt[idx].rpm*100,
+			    .temperature = dshotMotors.dt[idx].temp,
+			    .escIdx = idx
+      };
+      simpleMsgSend((BaseSequentialStream *) &SD1, (uint8_t *) &upMsg, sizeof(upMsg)); 
     }
-
-    return (crc_u);
+    
+    chThdSleepMilliseconds(100);
+  }
 }
 
-uint8_t calculateCrc8(const uint8_t *Buf, const uint8_t BufLen)
-{
-    uint8_t crc = 0;
-    for (int i = 0; i < BufLen; i++) {
-        crc = updateCrc8(Buf[i], crc);
-    }
 
-    return crc;
-}

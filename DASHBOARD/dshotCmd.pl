@@ -25,8 +25,8 @@ sub fletcher16 ($$);
 sub statusFunc ($$$$$$$);
 sub initSerial ($);
 sub serialCb();
-sub castelLinkMessageCb($);
-sub geneCastelLinkMsgsCB();
+sub dShotMessageCb($);
+sub geneDShotMsgsCB();
 sub getSerial();
 sub generateGui();
 sub generatePanel ();
@@ -49,23 +49,15 @@ my %tkObject = (
 my @varData = (
     {
 	'bat_voltage' => 0,	
-	'ripple_voltage' => 0,	
 	'current' => 0,	
-	'throttle' => 0,	
-	'power' => 0,		
+	'consumption' => 0,	
 	'rpm' => 0,		
-	'bec_voltage' => 0,	
-	'bec_current' => 0,	
 	'temperature' => 0,
     }, {
 	'bat_voltage' => 0,	
-	'ripple_voltage' => 0,	
 	'current' => 0,	
-	'throttle' => 0,	
-	'power' => 0,		
+	'consumption' => 0,	
 	'rpm' => 0,		
-	'bec_voltage' => 0,	
-	'bec_current' => 0,	
 	'temperature' => 0,
    }
 );
@@ -95,7 +87,7 @@ my $dbgBuf;
 
 
 #$mw->fileevent(\*FHD, 'readable', \&serialCb) ;
-$mw->repeat (100, \&geneCastelLinkMsgsCB);
+$mw->repeat (100, \&geneDShotMsgsCB);
 
 Tk::MainLoop;
 
@@ -113,7 +105,7 @@ Tk::MainLoop;
 sub generateGui()
 {
     $mw = MainWindow->new;
-    $mw->wm (title => "castel link live");
+    $mw->wm (title => "kiss dshot");
     my $w = $mw->screenwidth;
     my $h = $mw->screenheight;
 
@@ -298,7 +290,7 @@ sub serialCb()
 	    @crc = unpack ('CC', $crcBuf);
 	    $calculatedCrc =  ($crc[1] << 8)  | $crc[0];
 	    if ($calculatedCrc == $receivedCrc) {
-		castelLinkMessageCb (\$buffer);
+		dShotMessageCb (\$buffer);
 	    } else {
 		printf ("CRC DIFFER C:0x%x != R:0x%x\n", $calculatedCrc, $receivedCrc);
 	    }
@@ -331,11 +323,11 @@ sub fletcher16 ($$)
     return (($sum2 << 8) | $sum1);
 }
 
-sub castelLinkMessageCb ($)
+sub dShotMessageCb ($)
 {
     my ($bufferRef) = @_;
-    my ($msgId, $bat_voltage, $ripple_voltage, $current, $throttle, $power,		   
-	$rpm, $bec_voltage, $bec_current, $temperature, $channel) = unpack ('Lf9L', $$bufferRef);
+    my ($msgId, $bat_voltage, $current, $consumption,		   
+	$rpm, $temperature, $channel) = unpack ('Lf5L', $$bufferRef);
 
     if ($msgId != 0) {
 	warn "unknown msgId $msgId\n";
@@ -343,15 +335,11 @@ sub castelLinkMessageCb ($)
     }
 
     $varData[$channel]->{'bat_voltage'} = sprintf ("%.2f", $bat_voltage);
-    $varData[$channel]->{'ripple_voltage'} = sprintf ("%.2f", $ripple_voltage);
     $varData[$channel]->{'current'} = sprintf ("%.2f", $current);  
-    $varData[$channel]->{'throttle'} = sprintf ("%.2f", $throttle);
-    $varData[$channel]->{'power'} = sprintf ("%.2f", $power);	      
+    $varData[$channel]->{'consumption'} = sprintf ("%.0f", $consumption);  
     $varData[$channel]->{'rpm'} = sprintf ("%.0f", $rpm);
-    $varData[$channel]->{'bec_voltage'} = sprintf ("%.2f", $bec_voltage);    
-    $varData[$channel]->{'bec_current'} = sprintf ("%.2f", $bec_current);
     $varData[$channel]->{'temperature'} = sprintf ("%.1f", $temperature);
-#    say ".$channel";
+    # say ".$channel";
 }
 
 
@@ -387,7 +375,7 @@ sub getSerial()
 }
 
 
-sub geneCastelLinkMsgsCB()
+sub geneDShotMsgsCB()
 {
     foreach my $escIdx (0,1) {
 	my $dshotThrottle = 48+($tkObject{"clink${escIdx}"}*20); 
@@ -400,7 +388,7 @@ sub geneCastelLinkMsgsCB()
 	
 	my $buffer = pack ('sss', (0, $escIdx, $active ? $dshotThrottle: 0));
 	simpleMsgSend(\$buffer);
-	#	    say "DBG> [0, $escIdx, $dshotThrottle]"; 
+#	say "DBG> [0, $escIdx, $dshotThrottle]"; 
     
     }
 }
