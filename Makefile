@@ -147,6 +147,7 @@ CSRC = $(STARTUPSRC) \
        $(VARIOUS)/rtcAccess.c \
        $(VARIOUS)/hal_stm32_dma.c \
        $(VARIOUS)/simpleSerialMessage.c \
+       $(VARIOUS)/esc_dshot.c \
        ttyConsole.c \
        globalVar.c \
        main.c
