@@ -63,6 +63,22 @@ my @varData = (
 );
 
 
+my %specialOrders = (
+    'BEACON1' => 1,
+    'BEACON2' => 2,
+    'BEACON3' => 3,
+    'BEACON4' => 4,
+    'BEACON5' => 5,
+    'ESC_INFO' => 6,
+    'SPIN_DIRECTION_1' => 7,
+    'SPIN_DIRECTION_2' => 8,
+    '3D_MODE_OFF' => 9,
+    '3D_MODE_ON' => 10,
+    'SETTINGS_REQUEST' => 11,
+    'SAVE_SETTINGS' => 12,
+    'STREAM_MODE_ON_OFF' => 30,
+    'SILENT_MODE_ON_OFF' => 31
+    );
 
 my $serialName = $ARGV[0] // "/dev/ttyACMx";
 #my $serialHandle;
@@ -168,6 +184,20 @@ sub generateOneServoFrame ($$) {
 	labelLabelFrame($dataFrame, "$varName = ", \ ($varData[$escIdx]->{$varName}), 'left', 10);
     }
 
+   my $specialOrderFrame = $frame->Frame (-bd => '1m', -relief => 'sunken');
+    $specialOrderFrame->pack(-side => 'left', -anchor => 'w');
+
+    foreach my $varName (sort {$specialOrders{$a} <=>  $specialOrders{$b}} 
+			 keys %specialOrders) {
+	$specialOrderFrame->Button (-text => $varName,
+				    -command => sub {
+#					say "$varName => $specialOrders{$varName}";
+					my $buffer = pack ('sss', (0, $escIdx, $specialOrders{$varName}));
+					simpleMsgSend(\$buffer);
+				    }
+	    )->pack(-side => 'top', -pady => '2m', -padx => '0m', 
+		    -anchor => 'w', -fill => 'both', -expand => 'true');
+    }
 }
 
 
@@ -387,7 +417,7 @@ sub geneDShotMsgsCB()
 	}
 	
 	my $buffer = pack ('sss', (0, $escIdx, $active ? $dshotThrottle: 0));
-	simpleMsgSend(\$buffer);
+	simpleMsgSend(\$buffer) if $active;
 #	say "DBG> [0, $escIdx, $dshotThrottle]"; 
     
     }

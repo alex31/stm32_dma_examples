@@ -66,6 +66,8 @@ static const DSHOTConfig dshotConfig = {
 DSHOTDriver dshotd;
 
 static volatile uint16_t throttle;
+static volatile dshot_special_commands_t specialCommand = DSHOT_CMD_MAX;
+
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 static THD_WORKING_AREA(waSendTelemetry, 512);
@@ -100,8 +102,13 @@ int main(void)
   
   
   while (true) {
-    dshotSetThrottle(&dshotd, 0, throttle);
-    dshotSendFrame(&dshotd);
+    if (specialCommand == DSHOT_CMD_MAX) {
+      dshotSetThrottle(&dshotd, 0, throttle);
+      dshotSendFrame(&dshotd);
+    } else {
+      dshotSendSpecialCommand(&dshotd, 0, specialCommand);
+      specialCommand = DSHOT_CMD_MAX;
+    }
     chThdSleepMicroseconds(1000); // 1khz
   }
 }
@@ -134,8 +141,11 @@ static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void *
     switch (msg->msgId) {
     case PWM_ORDER : {
       const uint32_t rawThrottle = msg->duty;
-      if (rawThrottle) 
+      if (rawThrottle >= 48) { 
 	throttle = rawThrottle < 2047 ? rawThrottle : 2047;
+      } else {
+	specialCommand = msg->duty;
+      }
     }
       break;
     case CALIBRATE : DebugTrace ("Calibrate not yet implemented");
