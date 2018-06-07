@@ -188,7 +188,7 @@ static void sendTelemetryThd (void *arg)
   chRegSetThreadName("telemetry");
 
   while (true) {
-    for (int idx=0; idx<2; idx++) {
+    for (uint32_t idx=0; idx < DSHOT_CHANNELS; idx++) {
       const DshotTelemetry *tlm = dshotGetTelemetry(&dshotd, idx);
       if (tlm->temp != 0) {
 	const CommandUpMsg upMsg = (CommandUpMsg) {.msgId = 0,
