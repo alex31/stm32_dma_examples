@@ -105,11 +105,13 @@ int main(void)
     if (specialCommand == DSHOT_CMD_MAX) {
       dshotSetThrottle(&dshotd, 0, throttle);
       dshotSendFrame(&dshotd);
+      //      DebugTrace ("%u", throttle);
+      chThdSleepMilliseconds(throttle ? 1 : 50);
     } else {
       dshotSendSpecialCommand(&dshotd, 0, specialCommand);
       specialCommand = DSHOT_CMD_MAX;
+      chThdSleepMilliseconds(10); // 100hz
     }
-    chThdSleepMicroseconds(1000); // 1khz
   }
 }
 
@@ -141,7 +143,9 @@ static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void *
     switch (msg->msgId) {
     case PWM_ORDER : {
       const uint32_t rawThrottle = msg->duty;
-      if (rawThrottle >= 48) { 
+      if (rawThrottle == 0) { 
+	throttle = 0;
+      } else  if (rawThrottle >= 48) { 
 	throttle = rawThrottle < 2047 ? rawThrottle : 2047;
       } else {
 	specialCommand = msg->duty;
