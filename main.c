@@ -141,11 +141,7 @@ static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void *
     switch (msg->msgId) {
     case PWM_ORDER : {
       const uint32_t rawThrottle = msg->duty;
-      if (rawThrottle >= 48) { 
-	throttle = rawThrottle < 2047 ? rawThrottle : 2047;
-      } else {
-	specialCommand = msg->duty;
-      }
+      throttle = rawThrottle < 2047 ? rawThrottle : 2047;
     }
       break;
     case CALIBRATE : DebugTrace ("Calibrate not yet implemented");

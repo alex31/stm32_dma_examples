@@ -408,7 +408,7 @@ sub getSerial()
 sub geneDShotMsgsCB()
 {
     foreach my $escIdx (0,1) {
-	my $dshotThrottle = 48+($tkObject{"clink${escIdx}"}*20); 
+	my $dshotThrottle = ($tkObject{"clink${escIdx}"}*20.47); 
 	my $active = $tkObject{"clinkOn${escIdx}"}; # should get what have been select by radio button
 	
 	my $rout;
