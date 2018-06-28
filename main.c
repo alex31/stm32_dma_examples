@@ -68,12 +68,17 @@ DSHOTDriver dshotd;
 static volatile uint16_t throttle;
 static volatile dshot_special_commands_t specialCommand = DSHOT_CMD_MAX;
 
+const volatile int32_t * const tim8CntPtr = (volatile int32_t *) &(STM32_TIM8->CNT);
+#define TIM8_CNT (*tim8CntPtr)
+
+
+
 static THD_WORKING_AREA(waBlinker, 512);
 static noreturn void blinker (void *arg);
 static THD_WORKING_AREA(waSendTelemetry, 512);
 static noreturn void sendTelemetryThd (void *arg);
 static void telemetryReceive_cb(const uint8_t *buffer, const size_t len,  void * const userData);
-
+static void initTim8AsBasicDecoder (void);
 
 int main(void)
 {
@@ -99,7 +104,7 @@ int main(void)
   
   chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, blinker, NULL);
   chThdCreateStatic(waSendTelemetry, sizeof(waSendTelemetry), NORMALPRIO, &sendTelemetryThd, NULL);
-  
+  initTim8AsBasicDecoder();
   
   while (true) {
     if (specialCommand == DSHOT_CMD_MAX) {
@@ -112,6 +117,7 @@ int main(void)
       specialCommand = DSHOT_CMD_MAX;
       chThdSleepMilliseconds(10); // 100hz
     }
+    DebugTrace ("%lu", STM32_TIM8->CNT>>1);
   }
 }
 
@@ -211,3 +217,19 @@ static void sendTelemetryThd (void *arg)
 }
 
 
+static void initTim8AsBasicDecoder (void) {
+  rccEnableTIM8(NULL);
+  rccResetTIM8();
+  
+  STM32_TIM8->CR1 = 0;
+  
+  STM32_TIM8->SMCR = 1;          // Encoder mode 2 (input on TI1 edges)
+  STM32_TIM8->CCER = 0b1011;          // rising edge polarity
+  //  STM32_TIM8->CCER = 0b0010;
+  STM32_TIM8->ARR = 0xFFFFFFFF;      // count from 0-ARR or ARR-0
+  STM32_TIM8->CCMR1 = 0b11111101;    // f_DTS/32, N=8, IC1->TI1
+  STM32_TIM8->CNT = 0;           // Initialize counter
+  //  STM32_TIM8->EGR = 1;           // generate an update event
+
+  STM32_TIM8->CR1 = 0b00001;           // Enable the counter, upcounting
+}

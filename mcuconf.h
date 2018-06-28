@@ -205,6 +205,12 @@
 
 
 /*
+ * RAW TIMER use
+ */
+#define STM32_RAW_USE_TIM8		     TRUE
+
+
+/*
  * MAC driver system settings.
  */
 #define STM32_MAC_TRANSMIT_BUFFERS          2
