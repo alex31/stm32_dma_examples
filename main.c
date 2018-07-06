@@ -89,11 +89,11 @@ int main(void)
   chSysInit();
   initHeap();
   
-  sdStart(&SD1, &hostcfg);
+  sdStart(&DASHBOARD_SD, &hostcfg);
   dshotStart(&dshotd, &dshotConfig);
   consoleInit();
   consoleLaunch();
-  simpleMsgBind ((BaseSequentialStream *) &SD1, telemetryReceive_cb,
+  simpleMsgBind ((BaseSequentialStream *) &DASHBOARD_SD, telemetryReceive_cb,
 		 NULL, NULL);
   
   
@@ -203,7 +203,7 @@ static void sendTelemetryThd (void *arg)
 						   .temperature = tlm->temp,
 						   .escIdx = idx
 	};
-	simpleMsgSend((BaseSequentialStream *) &SD1, (uint8_t *) &upMsg, sizeof(upMsg));
+	simpleMsgSend((BaseSequentialStream *) &DASHBOARD_SD, (uint8_t *) &upMsg, sizeof(upMsg));
       }
       chThdSleepMilliseconds(100);
     }

@@ -8,7 +8,7 @@
  * USB Driver structure.
  */
 
-BaseSequentialStream *chp = (BaseSequentialStream *) &SD3;
+BaseSequentialStream *chp = (BaseSequentialStream *) &CONSOLE_DEV_SD;
 
 
 const uint8_t *UniqProcessorId = (uint8_t *) 0x1FFF7A10;

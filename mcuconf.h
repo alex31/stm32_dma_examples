@@ -350,7 +350,8 @@
 
 #define CH_HEAP_SIZE (32*1024)
 #define CH_HEAP_USE_TLSF 0 // if 0 or undef, chAlloc will be used
-#define CONSOLE_DEV_SD SD3
+#define CONSOLE_DEV_SD SD1
+#define DASHBOARD_SD SD3
 
 
 #endif /* _MCUCONF_H_ */
