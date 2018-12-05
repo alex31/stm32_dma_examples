@@ -325,6 +325,7 @@ sub serialCb()
 		printf ("CRC DIFFER C:0x%x != R:0x%x\n", $calculatedCrc, $receivedCrc);
 	    }
 	    $state = WAIT_FOR_SYNC;
+	    $buffer=undef;
 	}
     }
 }
